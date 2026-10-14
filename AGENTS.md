@@ -12,6 +12,13 @@ over repository guidance.
 > [MIGRATION.md](MIGRATION.md). The personal additions are domain semantics and
 > agent-facing assets only: the operating contract below still governs all changes
 > to `src/sci_rag/`, tests, and docs.
+>
+> **Spec governance.** The design baseline is
+> `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` (v1.1). Any improvement or
+> change derived from that spec (concepts C-1 to C-13, storage contract, scope and
+> privacy, feature behavior, acceptance criteria A1 to A7) requires a secondary review
+> by a non-author before merge. Process and task ledger: see [AGENT.md](AGENT.md),
+> section 5 and section 6.
 
 Treat this file as an operating contract, not as a substitute for the project documentation.
 Before changing an unfamiliar subsystem, read the nearest relevant source of truth:

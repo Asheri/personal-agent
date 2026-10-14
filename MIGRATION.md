@@ -45,6 +45,16 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
 - `plugins/pcmem_router.py`: memory router skeleton on the hook bus (spec 4.7
   trigger map; injections land in later phases).
 
+## Design baseline installed in-repo
+
+- `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` (spec v1.1) and
+  `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec审查.md` (review report): working
+  copies of the reviewed PC-Mem design artifacts. The reviewed originals stay outside
+  the repository at `C:/Users/12062/OneDrive/Desktop/items/` as the audit baseline.
+- Governance: every spec-derived improvement or change requires a secondary review by
+  a non-author before merge (AGENT.md section 5). Spec revisions bump the version and
+  are themselves reviewed; history is superseded, never rewritten.
+
 ## Deviations from copied sources (recorded, semantics unchanged)
 
 - `plugins/project_mode.py` and `docs/superpowers/specs/2026-10-14-spec-review-report.md`:
@@ -52,6 +62,9 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
   Reason: `tests/unit/test_docs_style.py::test_no_page_uses_an_em_dash` enforces
   "no em dashes anywhere in repository source". The spec review report already
   violated the repo's own rule before migration; no wording or meaning changed.
+- The two installed PC-Mem spec copies above: 6 and 2 em-dash punctuations replaced
+  with colons or a semicolon for the same house rule. Pure punctuation, semantics
+  unchanged; the originals outside the repository are untouched.
 
 ## Not migrated (deliberate, pending phases)
 
