@@ -1,0 +1,24 @@
+name: Domain specialization help
+description: Questions about adapting the kit to your field (ontology, prompts, evals)
+labels: [domain-help]
+body:
+  - type: textarea
+    id: domain
+    attributes:
+      label: Your domain and corpus
+      description: What field, roughly how many documents, and what kinds (papers, reports, protocols).
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What you are trying to figure out
+      description: Ontology design, seed questions, disappointing retrieval, prompt wording, and so on.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What you have tried and measured
+      description: Eval numbers help enormously (`sci-rag eval retrieval --ablation` output, or the report.md).
+      render: text

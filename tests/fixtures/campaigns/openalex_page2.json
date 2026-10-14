@@ -1,0 +1,20 @@
+{
+  "meta": {
+    "count": 4,
+    "per_page": 3,
+    "next_cursor": null
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W3019031047",
+      "doi": "https://doi.org/10.1038/s41586-020-2649-2",
+      "title": "Array programming with NumPy",
+      "publication_year": 2020,
+      "authorships": [
+        {"author": {"display_name": "Charles R. Harris"}}
+      ],
+      "primary_location": {"source": {"display_name": "Nature"}},
+      "open_access": {"oa_status": "hybrid", "is_oa": true}
+    }
+  ]
+}

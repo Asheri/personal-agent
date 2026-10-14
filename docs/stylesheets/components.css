@@ -1,0 +1,454 @@
+/* ── Section index rows ─────────────────────────────────────────────────
+ *
+ * Hub pages list their child pages as hairline-separated rows: title, one
+ * line of description, chevron. No box, no fill, no shadow.
+ */
+
+.srag-rows {
+  margin: 1.5rem 0 2rem;
+  border-top: 1px solid var(--srag-border);
+}
+
+.srag-rows > p {
+  margin: 0;
+}
+
+.md-typeset a.srag-row {
+  display: grid;
+  align-items: center;
+  column-gap: 1.2rem;
+  grid-template-columns: minmax(0, 1fr) 0.4rem;
+  padding: 0.85rem 0.1rem;
+  color: var(--srag-ink-800);
+  text-decoration: none;
+  border-bottom: 1px solid var(--srag-border);
+}
+
+.srag-row__title {
+  display: block;
+  grid-column: 1;
+  color: var(--srag-ink-950);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.srag-row__copy {
+  display: block;
+  grid-column: 1;
+  margin-top: 0.15rem;
+  color: var(--srag-muted-700);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.md-typeset a.srag-row::after {
+  width: 0.34rem;
+  height: 0.34rem;
+  align-self: center;
+  justify-self: end;
+  grid-row: 1 / -1;
+  grid-column: 2;
+  border-top: 1.5px solid var(--srag-muted-500);
+  border-right: 1.5px solid var(--srag-muted-500);
+  content: "";
+  transform: rotate(45deg);
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+.md-typeset a.srag-row:is(:hover, :focus-visible) .srag-row__title {
+  color: var(--srag-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
+}
+
+.md-typeset a.srag-row:is(:hover, :focus-visible)::after {
+  border-color: var(--srag-accent);
+  transform: rotate(45deg) translate(1px, -1px);
+}
+
+/* ── Page metadata strip ────────────────────────────────────────────── */
+
+.srag-meta-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.55rem 1.6rem;
+  margin: 1.2rem 0 2rem;
+  padding: 0.75rem 0;
+  color: var(--srag-ink-800);
+  font-size: 0.76rem;
+  border-block: 1px solid var(--srag-border);
+}
+
+.srag-meta-strip > div {
+  grid-column: span 3;
+  min-width: 0;
+}
+
+.srag-meta-strip > div:first-child:nth-last-child(5),
+.srag-meta-strip > div:first-child:nth-last-child(5) ~ div {
+  grid-column: span 2;
+}
+
+@media screen and (max-width: 40em) {
+  .srag-meta-strip > div,
+  .srag-meta-strip > div:first-child:nth-last-child(5),
+  .srag-meta-strip > div:first-child:nth-last-child(5) ~ div {
+    grid-column: span 6;
+  }
+}
+
+.srag-meta-strip strong {
+  display: block;
+  margin-bottom: 0.05rem;
+  color: var(--srag-muted-600);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
+/* ── Checkpoint and evidence panels ─────────────────────────────────── */
+
+.srag-checkpoint,
+.srag-evidence-panel {
+  margin: 1.4rem 0;
+  padding: 0.9rem 1.05rem;
+  border: 1px solid var(--srag-border);
+  border-left: 2px solid var(--srag-accent);
+  border-radius: 0 var(--srag-radius-sm) var(--srag-radius-sm) 0;
+  background: var(--srag-surface);
+}
+
+.srag-checkpoint > :first-child,
+.srag-evidence-panel > :first-child {
+  margin-top: 0;
+}
+
+.srag-checkpoint > :last-child,
+.srag-evidence-panel > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── Annotated directory tree ───────────────────────────────────────── */
+
+.srag-tree {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  padding: 1.05rem 1.15rem;
+  color: var(--srag-ink-800);
+  font-family: var(--md-code-font-family);
+  font-size: 0.72rem;
+  line-height: 1.7;
+  white-space: pre;
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  background: var(--srag-surface-soft);
+}
+
+/* ── Admonitions ────────────────────────────────────────────────────── */
+
+:root {
+  --md-admonition-icon--scientific: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1c0-.21-.07-.41-.18-.57L13 8.35V4h-2v4.35L5.18 18.43c-.11.16-.18.36-.18.57m1 3a3 3 0 0 1-3-3c0-.6.18-1.16.5-1.63L9 7.81V6a1 1 0 0 1-1-1V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v1a1 1 0 0 1-1 1v1.81l5.5 9.56c.32.47.5 1.03.5 1.63a3 3 0 0 1-3 3zm7-6 1.34-1.34L16.27 18H7.73l2.66-4.61zm-.5-4a.5.5 0 0 1 .5.5.5.5 0 0 1-.5.5.5.5 0 0 1-.5-.5.5.5 0 0 1 .5-.5"/></svg>');
+  --md-admonition-icon--why: url('data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11 18h2v-2h-2zm1-16A10 10 0 0 0 2 12a10 10 0 0 0 10 10 10 10 0 0 0 10-10A10 10 0 0 0 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8m0-14a4 4 0 0 0-4 4h2a2 2 0 0 1 2-2 2 2 0 0 1 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4"/></svg>');
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  box-shadow: none;
+  font-size: 0.7rem;
+}
+
+.md-typeset .admonition:focus-within,
+.md-typeset details:focus-within {
+  box-shadow: none;
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  color: var(--srag-ink-950);
+  font-weight: 600;
+  border-bottom: 1px solid var(--srag-border);
+  background: var(--srag-surface-soft);
+}
+
+.md-typeset .admonition-title::before,
+.md-typeset summary::before {
+  background-color: var(--srag-muted-600);
+}
+
+.md-typeset .admonition.scientific > .admonition-title::before,
+.md-typeset details.scientific > summary::before {
+  mask-image: var(--md-admonition-icon--scientific);
+  -webkit-mask-image: var(--md-admonition-icon--scientific);
+}
+
+.md-typeset .admonition.why > .admonition-title::before,
+.md-typeset details.why > summary::before {
+  mask-image: var(--md-admonition-icon--why);
+  -webkit-mask-image: var(--md-admonition-icon--why);
+}
+
+/* Semantic types keep a muted signal colour; everything else stays neutral. */
+.md-typeset .admonition:is(.warning, .caution, .attention, .danger, .failure, .error, .bug),
+.md-typeset details:is(.warning, .caution, .attention, .danger, .failure, .error, .bug) {
+  border-color: color-mix(in srgb, var(--srag-warning) 35%, var(--srag-border));
+}
+
+.md-typeset :is(.warning, .caution, .attention, .danger, .failure, .error, .bug) > :is(.admonition-title, summary) {
+  border-bottom-color: color-mix(in srgb, var(--srag-warning) 35%, var(--srag-border));
+  background: color-mix(in srgb, var(--srag-warning) 7%, var(--srag-surface));
+}
+
+.md-typeset :is(.warning, .caution, .attention, .danger, .failure, .error, .bug) > :is(.admonition-title, summary)::before {
+  background-color: var(--srag-warning);
+}
+
+/* ── Tables ─────────────────────────────────────────────────────────── */
+
+.md-typeset table:not([class]) {
+  font-size: 0.7rem;
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  box-shadow: none;
+}
+
+.md-typeset table:not([class]) th {
+  padding: 0.62em 0.9em;
+  color: var(--srag-ink-950);
+  font-weight: 600;
+  background: var(--srag-surface-soft);
+}
+
+/* Generated reference tables carry long unbreakable defaults (connection URLs,
+   dotted paths). Without this they claim most of the row and squeeze the
+   description column down to two or three characters per line. */
+.md-typeset table:not([class]) td {
+  padding: 0.62em 0.9em;
+  overflow-wrap: anywhere;
+  border-top: 1px solid var(--srag-border);
+}
+
+.md-typeset table:not([class]) tbody tr:hover {
+  background: var(--srag-surface-soft);
+  box-shadow: none;
+}
+
+/* Names in the first column read as identifiers, not as inline snippets, and
+   they never wrap mid-name the way auto table layout otherwise forces. */
+.md-typeset table:not([class]) td:first-child > code {
+  padding: 0;
+  color: var(--srag-ink-950);
+  white-space: nowrap;
+  border: 0;
+  background: transparent;
+}
+
+/* ── Navigation ─────────────────────────────────────────────────────── */
+
+.md-sidebar__scrollwrap {
+  scrollbar-width: thin;
+}
+
+/* ── Breadcrumbs ────────────────────────────────────────────────────── */
+
+/* The trail is a sibling of the article rather than part of it, so nothing
+   keeps the two flush unless they are given the same measure. The first three
+   values are the ones .md-content__inner carries in typography.css; change
+   them together. The fixed height is the other half of the promise: a trail
+   free to wrap would push the title down on long paths only, and the whole
+   point is that the title starts at one height everywhere. Long paths scroll
+   sideways instead. */
+.md-path {
+  width: calc(100% - 1.6rem);
+  max-width: 42rem;
+  height: 1.2rem;
+  margin-inline: auto;
+  margin-bottom: 0.35rem;
+  padding-top: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-size: 0.7rem;
+  scrollbar-width: none;
+}
+
+/* Once the sidebar docks, the theme stops centring the article and anchors it
+   beside the sidebar instead. The trail has to make the same move, or it sits
+   centred over a left-anchored title. */
+@media screen and (min-width: 76.25em) {
+  .md-sidebar--primary:not([hidden]) ~ .md-content > .md-path {
+    margin-inline-start: 1.2rem;
+  }
+}
+
+.md-path::-webkit-scrollbar {
+  display: none;
+}
+
+.md-path__list {
+  height: 100%;
+  flex-wrap: nowrap;
+}
+
+.md-path__link {
+  white-space: nowrap;
+}
+
+.md-nav__link--active {
+  font-weight: 600;
+}
+
+/* These hub pages are ordinary documents rather than directory index.md files,
+   so navigation.indexes cannot fold them into their section link. Material
+   therefore prints the section name as an inert label directly above the page
+   link that carries the same words. On desktop the tab bar already names the
+   section, so the label is pure duplication and goes. The mobile drawer keeps
+   it: there is no tab bar there, and the label is the row you tap. */
+@media screen and (min-width: 76.25em) {
+  .md-nav--lifted > .md-nav__list > .md-nav__item--active > .md-nav__link:not(.md-nav__container) {
+    display: none;
+  }
+}
+
+@media screen and (min-width: 76.25em) {
+  /* Wide enough that entry titles hold one line. The column runs the full
+     height of the viewport so its rule meets the header rule and continues to
+     the bottom, and it scrolls independently of the page. */
+  .md-header--lifted ~ .md-container .md-sidebar,
+  .md-sidebar--primary {
+    top: 2.4rem;
+  }
+
+  /* No top offset, so the rule meets the header's hairline and reads as a T. */
+  .md-sidebar--primary {
+    width: 17rem;
+    height: calc(100vh - 2.4rem);
+    padding: 0;
+    border-right: 1px solid var(--srag-border);
+  }
+
+  .md-sidebar--primary .md-sidebar__scrollwrap {
+    height: 100%;
+    margin: 0;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  /* 0.75rem here plus the row's own 0.45rem padding puts the first character
+     at 24px, the same left edge as the flask mark in the header above it. */
+  .md-sidebar--primary .md-sidebar__inner {
+    padding-top: 0.9rem;
+    padding-right: 0.6rem;
+    padding-bottom: 2rem;
+    padding-left: 0.75rem;
+  }
+
+  .md-main__inner {
+    margin-top: 0;
+    gap: 1.6rem;
+  }
+
+  .md-content {
+    padding-top: 0.9rem;
+  }
+
+  .md-header--lifted ~ .md-container .md-typeset :target {
+    --md-scroll-margin: 3.6rem;
+  }
+}
+
+/* Scrollbars stay a hairline grey. Material darkens them to the accent colour
+   on hover and focus, which reads as a saturated blue bar down the sidebar. */
+.md-sidebar__scrollwrap,
+.md-sidebar__scrollwrap:hover,
+.md-sidebar__scrollwrap:focus-within,
+.md-search__scrollwrap,
+.md-search__scrollwrap:hover,
+.md-typeset__scrollwrap,
+.md-typeset pre > code,
+.md-typeset pre > code:hover,
+.md-typeset .highlight pre,
+.md-typeset .srag-tree,
+.srag-home-tree,
+.mermaid {
+  scrollbar-width: thin;
+  scrollbar-color: var(--srag-border-strong) transparent;
+}
+
+.md-sidebar__scrollwrap:hover::-webkit-scrollbar-thumb,
+.md-sidebar__scrollwrap:focus-within::-webkit-scrollbar-thumb,
+.md-search__scrollwrap::-webkit-scrollbar-thumb {
+  background-color: var(--srag-border-strong);
+}
+
+.md-sidebar__scrollwrap:hover::-webkit-scrollbar-thumb:hover,
+.md-search__scrollwrap::-webkit-scrollbar-thumb:hover {
+  background-color: var(--srag-muted-500);
+}
+
+::-webkit-scrollbar {
+  width: 0.4rem;
+  height: 0.4rem;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--srag-border-strong);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--srag-muted-500);
+}
+
+/* Rows: quiet by default, rounded fill on hover, filled pill when current. */
+.md-sidebar--primary .md-nav__link {
+  padding: 0.32rem 0.45rem;
+  border-radius: var(--srag-radius-sm);
+  color: var(--srag-muted-700);
+  line-height: 1.4;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.md-sidebar--primary .md-nav__link:hover {
+  color: var(--srag-ink-950);
+  background: var(--srag-surface-soft);
+}
+
+.md-sidebar--primary .md-nav__link--active,
+.md-sidebar--primary .md-nav__link--active:hover {
+  color: var(--srag-ink-950);
+  font-weight: 600;
+  background: var(--srag-surface-tinted);
+}
+
+/* Every indented level carries a guide rule, so depth is readable at a glance
+   whether the child is another section, a page, or a heading in this page. */
+[dir="ltr"] .md-sidebar--primary .md-nav__list .md-nav__list {
+  margin-left: 0.45rem;
+  padding-right: 0;
+  padding-left: 0.5rem;
+  border-left: 1px solid var(--srag-border);
+}
+
+/* The outermost level is the current section's own page list. It is not an
+   indent relative to anything visible, so it carries no rule. */
+[dir="ltr"] .md-sidebar--primary .md-nav--lifted > .md-nav__list > .md-nav__item > .md-nav > .md-nav__list {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+/* Integrated table of contents: the current page's headings nest under it. */
+.md-nav--secondary .md-nav__link {
+  font-size: 0.68rem;
+}
+
+.md-nav--secondary .md-nav__link--active {
+  color: var(--srag-accent);
+  background: transparent;
+}

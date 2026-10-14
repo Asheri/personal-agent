@@ -1,0 +1,18 @@
+# Devcontainer overlay: adds an app container next to the db service from
+# the root docker-compose.yml. Inside this network the database is reached
+# as host "db" on 5432 (no published-port indirection).
+#
+# Note on the volume path: with multiple compose files, relative paths
+# resolve against the FIRST file's directory (the repo root), so the
+# workspace mount is "." here, not "..".
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/python:3.12
+    volumes:
+      - .:/workspaces/sci-rag-kit:cached
+    command: sleep infinity
+    environment:
+      SCI_RAG_DATABASE_URL: postgresql+asyncpg://sci_rag:sci_rag@db:5432/sci_rag
+    depends_on:
+      db:
+        condition: service_healthy

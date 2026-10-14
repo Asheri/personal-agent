@@ -1,0 +1,16 @@
+{
+  "doi": "10.1038/s41586-020-2649-2",
+  "doi_url": "https://doi.org/10.1038/s41586-020-2649-2",
+  "is_oa": true,
+  "oa_status": "green",
+  "title": "Array programming with NumPy",
+  "year": 2020,
+  "best_oa_location": {
+    "host_type": "repository",
+    "license": null,
+    "url": "https://repository.example.org/numpy",
+    "url_for_landing_page": "https://repository.example.org/numpy",
+    "url_for_pdf": "https://repository.example.org/numpy.pdf",
+    "version": "acceptedVersion"
+  }
+}

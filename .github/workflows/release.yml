@@ -1,0 +1,225 @@
+# Publish sci-rag-kit to PyPI on a version tag.
+#
+# Trusted Publishing (OIDC) rather than a long-lived API token: GitHub mints a
+# short-lived credential for this workflow, so there is no secret in the
+# repository to leak or rotate. The PyPI side of that trust has to be
+# configured once by a maintainer; see docs/VERSIONING.md.
+#
+# The tag is the source of truth for the version. `sci-rag-new` fetches the
+# template at the tag matching its own installed version, so a release whose
+# tag and pyproject version disagree would produce projects from the wrong
+# commit. The verify job below refuses that case.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      # A tag can be pushed to any commit, including one that never went
+      # through a pull request. Publishing is irreversible, so confirm the
+      # tagged commit is one CI already passed on.
+      - name: CI is green for the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CONCLUSION=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&status=completed" \
+            --jq '[.workflow_runs[] | .conclusion] | first // "none"')
+          echo "ci conclusion for ${GITHUB_SHA}: $CONCLUSION"
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "::error::the ci workflow has not passed for this commit (got: $CONCLUSION)"
+            exit 1
+          fi
+
+      - name: The tag matches the packaged version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PACKAGED=$(uv run --no-project python -c \
+            "import tomllib,pathlib;print(tomllib.loads(pathlib.Path('pyproject.toml').read_text())['project']['version'])")
+          echo "tag=$TAG packaged=$PACKAGED"
+          if [ "$TAG" != "$PACKAGED" ]; then
+            echo "::error::tag v$TAG does not match pyproject version $PACKAGED"
+            exit 1
+          fi
+
+      - name: Build the sdist and wheel
+        run: uv build
+
+      # A README that fails to render is the classic way a first release
+      # lands on PyPI looking broken, and the version cannot be reuploaded.
+      - name: The package metadata renders
+        run: uvx twine check --strict dist/*
+
+      - name: The built wheel exposes both entry points
+        run: |
+          uv venv "$RUNNER_TEMP/probe"
+          VIRTUAL_ENV="$RUNNER_TEMP/probe" uv pip install --quiet dist/*.whl
+          "$RUNNER_TEMP/probe/bin/sci-rag" --help > /dev/null
+          "$RUNNER_TEMP/probe/bin/sci-rag-new" --help > /dev/null
+
+      # The generator fetches the template at the tag matching its version, so
+      # a release whose tag is not reachable on GitHub produces nothing.
+      - name: The generator resolves its own tag
+        run: |
+          "$RUNNER_TEMP/probe/bin/python" -c "
+          from sci_rag.scaffold.fetch import tarball_url, template_ref
+          ref = template_ref()
+          print(ref, tarball_url(ref))
+          assert ref == '${GITHUB_REF_NAME}', f'{ref} != ${GITHUB_REF_NAME}'
+          "
+
+      # F-002: published v0.3.0 had no `new` subcommand, so `pipx install
+      # sci-rag-kit` followed by `sci-rag new` (the first two commands in the
+      # README, the homepage, and the quickstart) exited 2 on `No such command
+      # 'new'`. Installing the wheel and running `--help`, which the step above
+      # does, cannot see that: the route breaks at the command the front door
+      # leads with, and `sci-rag new` also fetches the template at its own tag,
+      # which no import check exercises. So the release runs the public pair,
+      # through pipx, from a home that holds nothing.
+      - name: The documented two-command route works from a clean pipx home
+        run: |
+          set -e
+          python -m pip install --quiet --upgrade pipx
+          export PIPX_HOME="$RUNNER_TEMP/pipx-home"
+          export PIPX_BIN_DIR="$RUNNER_TEMP/pipx-bin"
+          pipx install ./dist/*.whl
+          # Ask the CLI whether the subcommand resolves. Typer exits 2 with
+          # "No such command" when it does not, which is F-002's own symptom.
+          # An earlier version grepped the rendered help table for " new " and
+          # failed on a runner with the command present: Rich decides that
+          # layout from terminal detection, so the check was testing the
+          # renderer rather than the CLI.
+          if ! "$PIPX_BIN_DIR/sci-rag" new --help > /dev/null 2>&1; then
+            echo "::error::the published CLI has no 'new' command"
+            "$PIPX_BIN_DIR/sci-rag" --help || true
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/onboarding"
+          cd "$RUNNER_TEMP/onboarding"
+          "$PIPX_BIN_DIR/sci-rag" new --defaults
+          test -f ./*/pyproject.toml
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  # TestPyPI first, always. It is the only way to find a packaging problem
+  # before the version number is burned: PyPI does not allow re-uploading a
+  # version, even a broken one.
+  testpypi:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/sci-rag-kit
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
+
+  pypi:
+    needs: testpypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sci-rag-kit
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  # The tag was already the release, so the Releases page fell three versions
+  # behind PyPI without anything failing: v0.4.0, v0.4.1, and v0.5.0 all
+  # published while the page still offered v0.3.0 as "Latest". Someone landing
+  # there saw a current-looking answer that was months of work out of date,
+  # which is the same failure the version-claim tests guard inside the repo.
+  #
+  # Last, and only after `pypi` succeeds. A release page is an announcement,
+  # and announcing an artifact that did not publish is worse than announcing
+  # nothing. Ordering it here also means the manual approval on `pypi` still
+  # gates everything downstream of it.
+  github_release:
+    needs: pypi
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist/
+
+      # The changelog is written for people and this page is read by people,
+      # so it gets that prose rather than a generated commit list. The script
+      # exits non-zero when the section is absent or empty, which fails the
+      # job instead of publishing a blank page.
+      - name: Take the notes from the changelog
+        run: |
+          python3 scripts/changelog_release_notes.py \
+            --version "${GITHUB_REF_NAME}" > "$RUNNER_TEMP/notes.md"
+          echo "--- notes for ${GITHUB_REF_NAME} ---"
+          cat "$RUNNER_TEMP/notes.md"
+
+      # `--verify-tag` refuses to invent a tag if the ref went missing.
+      #
+      # An existing release is left alone rather than overwritten, because its
+      # notes may have been edited by hand and a rerun of an already-published
+      # tag should not quietly discard that.
+      #
+      # `--prerelease` is added only when it applies, rather than passed a
+      # boolean. A prerelease must not take the "Latest" badge: `sci-rag-new`
+      # resolves its template at its own tag rather than at whatever GitHub
+      # calls latest, so this is presentation, but the page is what a person
+      # reads before they read anything else.
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" > /dev/null 2>&1; then
+            echo "release ${GITHUB_REF_NAME} already exists; leaving it as it is"
+            exit 0
+          fi
+
+          KIND=()
+          if printf '%s' "${GITHUB_REF_NAME#v}" | grep -qE '(a|b|rc)[0-9]+$'; then
+            echo "${GITHUB_REF_NAME} looks like a prerelease"
+            KIND=(--prerelease)
+          fi
+
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag \
+            "${KIND[@]}" \
+            dist/*

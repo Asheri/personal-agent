@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose an improvement to the kit
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem it solves
+      description: What is hard or impossible today, concretely.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What you would change, and where it fits (see docs/architecture.md extension points).
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence it helps
+      description: For retrieval/eval changes, before/after ablation numbers are the currency here.

@@ -1,0 +1,139 @@
+# Does the Docker-free database actually work?
+#
+# `docs/quickstart.md` tells pixi and conda users they can run PostgreSQL and
+# pgvector from conda-forge instead of a container. An untested instruction is
+# worse than no instruction, so this runs the real integration and server
+# suites against a server installed that way, on the two platforms the
+# quickstart names.
+#
+# It is deliberately separate from `ci.yml`. That workflow proves the
+# supported floor, PostgreSQL 16 from the pgvector container image, on every
+# pull request. This one proves the other end of the range in ADR 0008:
+# whatever conda-forge resolves inside it, which is PostgreSQL 18 today.
+#
+# macOS runners are expensive, so a pull request gets linux-64 only unless it
+# changes something that decides what the Docker-free path looks like. Nightly
+# runs and release tags get both.
+name: docker-free-postgres
+
+on:
+  pull_request:
+  schedule:
+    - cron: "30 6 * * *"
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: docker-free-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  select:
+    name: select-platforms
+    runs-on: ubuntu-latest
+    outputs:
+      platforms: ${{ steps.pick.outputs.platforms }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: pick
+        env:
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          BOTH='[{"os":"ubuntu-latest","platform":"linux-64"},{"os":"macos-latest","platform":"osx-arm64"}]'
+          LINUX='[{"os":"ubuntu-latest","platform":"linux-64"}]'
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "platforms=$BOTH" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          CHANGED=$(git diff --name-only "origin/$BASE...HEAD")
+          echo "$CHANGED"
+          if echo "$CHANGED" | grep -qE '^(scripts/local_postgres|src/sci_rag/db/|migrations/|src/sci_rag/scaffold/runners|[.]github/workflows/docker-free-postgres)'; then
+            echo "the diff changes what this path looks like; running both platforms"
+            echo "platforms=$BOTH" >> "$GITHUB_OUTPUT"
+          else
+            echo "platforms=$LINUX" >> "$GITHUB_OUTPUT"
+          fi
+
+  integration:
+    needs: select
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.select.outputs.platforms) }}
+    env:
+      SCI_RAG_LOCAL_PG_PORT: "5433"
+      SCI_RAG_LOCAL_PG_DB: sci_rag_test
+      SCI_RAG_TEST_DATABASE_URL: postgresql+asyncpg://sci_rag:sci_rag@127.0.0.1:5433/sci_rag_test
+    steps:
+      - uses: actions/checkout@v7
+
+      # The project itself installs with uv, exactly as in ci.yml. Only the
+      # database comes from conda-forge, which is the whole subject here.
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync
+
+      # micromamba rather than a full conda: this needs two packages, and the
+      # action caches them, so the leg stays close to a uv one in cost.
+      - uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: pgserver
+          condarc: |
+            channels:
+              - conda-forge
+          # No quotes: the action execs micromamba directly rather than
+          # through a shell, so a quote here becomes part of the version spec
+          # and libmamba rejects `19"`.
+          create-args: >-
+            postgresql>=16,<19
+            pgvector
+          cache-environment: true
+          init-shell: bash
+
+      - name: The server and the extension came from conda-forge
+        shell: bash -el {0}
+        run: |
+          which initdb pg_ctl psql
+          postgres --version
+
+      - name: Start the database with no container runtime
+        shell: bash -el {0}
+        run: |
+          uv run python scripts/local_postgres.py start
+          uv run python scripts/local_postgres.py status
+
+      - name: The integration and server suites pass against it
+        shell: bash -el {0}
+        run: |
+          # A skipped integration suite is indistinguishable from a passing
+          # one in the check mark, and proving these tests really ran is this
+          # job's only purpose, so treat the skip path as a failure.
+          set -o pipefail
+          uv run pytest tests/integration tests/server -q -rs 2>&1 | tee run.log
+          if grep -q "Postgres unavailable" run.log; then
+            echo "::error::the suite skipped instead of running against the conda-forge server"
+            exit 1
+          fi
+
+      - name: Stop it again
+        if: always()
+        shell: bash -el {0}
+        run: uv run python scripts/local_postgres.py stop
+
+  gate:
+    name: docker-free-postgres-gate
+    needs: [select, integration]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every Docker-free PostgreSQL leg passed
+        run: |
+          echo "select=${{ needs.select.result }} integration=${{ needs.integration.result }}"
+          [ "${{ needs.select.result }}" = "success" ] || exit 1
+          [ "${{ needs.integration.result }}" = "success" ] || exit 1

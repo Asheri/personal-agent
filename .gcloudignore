@@ -1,0 +1,33 @@
+# What `gcloud builds submit` is allowed to upload from this repository.
+#
+# Without this file gcloud derives its upload set from .gitignore, which is
+# close but not the same thing: a path ignored only through .git/info/exclude
+# is tracked by nobody and uploaded anyway. This file is the explicit answer.
+#
+# The rule is fail closed, matching .dockerignore: exclude everything, then
+# re-admit exactly the inputs the build needs. It admits the same set as
+# .dockerignore, so a Cloud Build submission and a local build see the
+# same directory.
+#
+# Adding a COPY to the Dockerfile means adding its source here.
+#
+# See docs/deploy-gcp.md and tests/unit/test_build_context.py.
+
+/*
+
+!/pyproject.toml
+!/uv.lock
+!/README.md
+!/alembic.ini
+!/src
+!/domain
+!/migrations
+!/Dockerfile
+!/.dockerignore
+
+# Bytecode lives inside the directories above, so it survives the allowlist
+# and would upload one developer's .pyc to Cloud Build. Re-excluded by name
+# to keep that exception visible.
+__pycache__/
+*.pyc
+*.pyo

@@ -1,0 +1,43 @@
+{
+  "name": "benchmark-20260828-045130",
+  "created_at": "2026-08-28T04:54:54.309829+00:00",
+  "git_commit": "821bf0a",
+  "counts": {
+    "documents": 5,
+    "chunks": 34,
+    "entities": 67,
+    "relationships": 80,
+    "communities": 8
+  },
+  "embedding_versions": [
+    "gemini-embedding-001@1536"
+  ],
+  "corpus_digest": "bcb122774b26e665e8e69b18a31b6236c5a8eb4620f576ed76deb802ecd0d13c",
+  "documents": [
+    {
+      "id": "1e76dddd7f4d441f99bbe70cb4021776",
+      "title": "Small-Scale Gasification of Walnut Shells and Orchard Chips",
+      "content_hash": "3646f524c6720fc638cf0cc87ac43d9eb0e943e9d2a3fc53dc528686549b8a26"
+    },
+    {
+      "id": "e632f154bd1642e2a2b5858297783b5a",
+      "title": "Colusa Basin Rice Straw Resource Assessment 2023",
+      "content_hash": "3a444608d7be6e8775affb7182de7178b4f528b110550ed051096be916b4ff48"
+    },
+    {
+      "id": "b7076d3833d44a8e84a608a896588b26",
+      "title": "Anaerobic Digestion of Crop Residues: A Working Primer",
+      "content_hash": "6ec5af41b3171d4451f510f63ce1857973cf131b2d30fc276ca57de5db6b70eb"
+    },
+    {
+      "id": "dad6b356f104482687253763a3d4a909",
+      "title": "Demo Region Policy Landscape for Agricultural Residue Utilization",
+      "content_hash": "809438fd081bd81d084cee1ea18cb8e246211a4dc50fe23c208251086492b3f0"
+    },
+    {
+      "id": "603602cea15a45758a903fc57f67d4fb",
+      "title": "Almond Pruning and Orchard Residue Logistics Guide",
+      "content_hash": "b35229c46d37fdc3c78cfe281eaa748156288cd55617d21ab2ecdec7a37e6e9d"
+    }
+  ]
+}

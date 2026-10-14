@@ -1,0 +1,17 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1000/retracted",
+    "container-title": ["Journal of Reproducible Results"],
+    "is-referenced-by-count": 17,
+    "update-to": [
+      {
+        "DOI": "10.1000/retraction-notice",
+        "type": "retraction",
+        "label": "Retraction"
+      }
+    ]
+  }
+}

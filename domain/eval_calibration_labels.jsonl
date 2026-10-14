@@ -1,0 +1,19 @@
+# Non-expert seed labels for judge calibration on the demo corpus.
+# Labeled 2026-08-27 by the kit's authors (NOT domain experts) reading the
+# generated answers and their sources from the demo answers eval run,
+# without looking at the judge's scores first. They demonstrate the
+# calibration workflow and pin the file format; domain expert labels
+# (BioCirV collaboration for the flagship deployment) supersede them for
+# any real claim about judge reliability. 10 rows: one per demo seed
+# question. Expand toward 30+ labeled answers before treating kappa as
+# stable (see docs/evaluation.md).
+{"question_id": "rice-straw-generated", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "rice-straw-baled", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "rice-straw-ash", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "almond-pruning-yield", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "biogas-yield-pretreated", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "chipping-cost", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "chip-moisture-limit", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "ruc-payment", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "digester-siting", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}
+{"question_id": "switchgrass-honesty", "groundedness": 2, "citation_accuracy": 2, "completeness": 2, "correctness": 2}

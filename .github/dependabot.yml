@@ -1,0 +1,27 @@
+# Weekly dependency update PRs. CI (including the coverage floor and the
+# smoke eval) is the gate that keeps them honest.
+version: 2
+updates:
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      python-dependencies:
+        patterns: ["*"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # Python feature releases change the supported runtime contract. Keep
+      # patch refreshes automatic, but review minor and major lines together
+      # with CI, containers, generated projects, metadata, and documentation.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"

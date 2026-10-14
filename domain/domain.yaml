@@ -1,0 +1,135 @@
+# ---------------------------------------------------------------------------
+# The domain profile. This file, the prompts/ folder next to it, and
+# eval_seed_questions.jsonl are the ONLY things you edit to point the kit at
+# a new scientific field. See domain/README.md for a guided walkthrough.
+#
+# This template ships configured for the demo domain: agricultural residues
+# and their conversion to fuels and products. Replace it with your own.
+# ---------------------------------------------------------------------------
+
+name: "Agricultural Residue Knowledge Base"
+description: >
+  Availability, characteristics, and conversion pathways of agricultural
+  residues (orchard prunings, straws, hulls, and similar) for fuels and
+  bioproducts.
+
+# The concepts the graph extractor looks for. Pick 6 to 15 types that an
+# expert in your field would use to organize knowledge. Short descriptions
+# matter: they are shown to the extraction model verbatim.
+entity_types:
+  - name: Feedstock
+    description: "A biomass or residue stream (almond prunings, rice straw, walnut shells)"
+  - name: Crop
+    description: "The crop a residue comes from (almonds, rice, grapes)"
+  - name: Region
+    description: "A geographic area (a county, a valley, a state)"
+  - name: ConversionProcess
+    description: "A process turning feedstock into products (gasification, anaerobic digestion, pyrolysis)"
+  - name: Product
+    description: "An output of conversion (renewable diesel, biochar, biogas)"
+  - name: Property
+    description: "A measured characteristic (moisture content, ash content, yield per acre)"
+  - name: Equipment
+    description: "Machinery used in collection or conversion (chippers, balers, digesters)"
+  - name: Policy
+    description: "A regulation, incentive, or standard affecting residue use"
+  - name: Organization
+    description: "An agency, lab, company, or program"
+
+# How entities relate. Directed: "source RELATION target".
+relation_types:
+  - name: PRODUCES
+    description: "Source yields target (a crop produces a residue; a process produces a product)"
+  - name: CONVERTED_BY
+    description: "Feedstock is converted by a process"
+  - name: LOCATED_IN
+    description: "Something is grown, collected, or sited in a region"
+  - name: HAS_PROPERTY
+    description: "Feedstock or product has a measured property"
+  - name: REQUIRES
+    description: "A process or activity needs an input, condition, or equipment"
+  - name: AFFECTS
+    description: "A policy, practice, or property influences something"
+  - name: COMPETES_WITH
+    description: "Two uses or pathways compete for the same resource"
+
+# Query classes steer HyDE (the retrieval layer that writes a hypothetical
+# answer and searches for text resembling it). Keywords are matched against
+# the user's question; the instruction shapes the hypothetical passage.
+query_classes:
+  - name: availability
+    keywords: [availability, supply, tons, acreage, yield, county, region, much]
+    hyde_instruction: >
+      Write as a regional biomass resource assessment would: name the region,
+      the crop and residue, and quantitative availability (tons per year,
+      acres, yield per acre).
+  - name: properties
+    keywords: [moisture, ash, composition, content, heating, density, lignin, cellulose]
+    hyde_instruction: >
+      Write as a feedstock characterization section would: report measured
+      properties with units and typical ranges.
+  - name: conversion
+    keywords: [conversion, process, digestion, pyrolysis, gasification, fermentation, produce, biofuel]
+    hyde_instruction: >
+      Write as a process description would: name the conversion technology,
+      operating conditions, inputs, and product yields.
+  - name: logistics
+    keywords: [collection, transport, storage, cost, baling, chipping, logistics]
+    hyde_instruction: >
+      Write as a supply chain analysis would: describe collection methods,
+      equipment, storage, and costs per ton.
+
+# Fusion weights and per-layer candidate limits. The defaults are proven;
+# change them only with the evaluation harness watching (sci-rag eval).
+retrieval:
+  weights:
+    vector: 1.5
+    keyword: 1.0
+    graph: 0.8
+    community: 0.6
+    hyde: 1.2
+  rrf_k: 60
+  candidate_limits:
+    vector: 20
+    keyword: 20
+    graph: 20
+    community: 5
+    hyde: 20
+  # Graph relationship confidence is inert by default for compatibility
+  # with existing corpora. Raise min_confidence only after calibrating the
+  # extractor on your domain. Enable confidence_weighted only when the
+  # confidence_weighted vs full_deep retrieval ablation supports it.
+  graph:
+    min_confidence: 0.0
+    confidence_weighted: false
+    include_citations: false
+  # Post-fusion reranking: a second look at the fused pool with the actual
+  # text in view. OFF by default; enable it only after `sci-rag eval
+  # retrieval --ablations` shows with_rerank beating no_rerank on YOUR
+  # corpus. adapter: "llm" (no new dependency) or "local" (needs the
+  # `rerank` extra; `model` overrides the cross-encoder checkpoint).
+  reranker:
+    enabled: false
+    adapter: llm
+    pool: 20
+    timeout_s: 15.0
+
+# Question-aware compression between retrieval and answer prompt assembly.
+#
+# ON for the shipped demo, with the floor at 0.0: summarize every source, drop
+# none. The paired judged-answer gate was re-run for v0.3 across a floor sweep
+# and this is the setting where it holds. Two independent paired runs at 0.0:
+# every judged dimension identical to the uncompressed baseline, median prompt
+# tokens 25% to 27% lower.
+#
+# The floor is the whole story. At 0.15 and 0.3 groundedness and citation
+# accuracy both fall off 2.00, because the floor discards evidence the answer
+# then cannot ground itself in. Summarizing sources is safe here; dropping them
+# is not. Raise the floor only with a paired run that still holds.
+#
+# Re-run the gate before carrying this to another corpus. See
+# docs/benchmarks.md.
+compression:
+  enabled: true
+  relevance_floor: 0.0
+  max_tokens_per_chunk: 160

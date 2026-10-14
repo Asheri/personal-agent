@@ -1,0 +1,6 @@
+# [Global Memory - L2]
+## [PC-Mem 环境]
+- 主仓库: C:/Users/12062/OneDrive/Desktop/personal-agent (sci-rag-kit fork + GenericAgent 记忆面)
+- 个人域: domain-personal/, 用 SCI_RAG_DOMAIN_DIR=domain-personal 切换; domain/ 为出厂 demo 域, 测试基线依赖它
+- 数据库: SCI_RAG_DB_BACKEND=docker 时容器 sci-rag-kit-db-1 (pgvector, 端口 5433); 测试库只用 SCI_RAG_TEST_DATABASE_URL 指向一次性库
+- 凭据: .env 不入库不打印; 本机若无生成凭据, 图路径整体降级, 向量与关键字检索仍可用

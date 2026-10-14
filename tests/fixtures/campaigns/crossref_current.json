@@ -1,0 +1,10 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1000/current",
+    "container-title": [],
+    "is-referenced-by-count": 0
+  }
+}

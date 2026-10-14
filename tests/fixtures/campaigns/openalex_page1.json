@@ -1,0 +1,34 @@
+{
+  "meta": {
+    "count": 4,
+    "per_page": 3,
+    "next_cursor": "cursor-page-2"
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W2741809807",
+      "doi": "https://doi.org/10.7717/peerj.4375",
+      "title": "The state of OA: a large-scale analysis of the prevalence and impact of Open Access articles",
+      "publication_year": 2018,
+      "authorships": [
+        {"author": {"display_name": "Heather Piwowar"}},
+        {"author": {"display_name": "Jason Priem"}}
+      ],
+      "primary_location": {"source": {"display_name": "PeerJ"}},
+      "open_access": {"oa_status": "gold", "is_oa": true}
+    },
+    {
+      "id": "https://openalex.org/W-malformed",
+      "title": "A record without a DOI"
+    },
+    {
+      "id": "https://openalex.org/W-duplicate",
+      "doi": "HTTPS://DOI.ORG/10.7717/PEERJ.4375",
+      "title": "Duplicate DOI representation",
+      "publication_year": 2018,
+      "authorships": [],
+      "primary_location": null,
+      "open_access": {"oa_status": "gold", "is_oa": true}
+    }
+  ]
+}

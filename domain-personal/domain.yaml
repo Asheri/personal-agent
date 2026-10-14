@@ -1,0 +1,134 @@
+# ---------------------------------------------------------------------------
+# The domain profile for the personal file space (PC-Mem).
+#
+# Switch to this profile with:  SCI_RAG_DOMAIN_DIR=domain-personal
+# The shipped demo profile under domain/ stays untouched, so the test suite and
+# the demo corpus keep their calibrated baseline. See domain-personal/README.md
+# for what is specialized here and which known gaps remain.
+#
+# Design contract: docs of the PC-Mem spec, section 4.2. Entity types must stay
+# between 6 and 15. Descriptions are shown to the extraction model verbatim.
+# ---------------------------------------------------------------------------
+
+name: "Personal File Space"
+description: >
+  A single user's local files (papers, slides, documents, code, data, images,
+  meeting notes, mail exports) and the work history they record.
+
+# The concepts the graph extractor looks for. "Document" here means a work
+# artifact mentioned inside the text, not a row of this database (a row is a
+# document in the storage sense; the two are kept distinct on purpose).
+entity_types:
+  - name: Person
+    description: "A person named in the files (author, recipient, colleague, contact)"
+  - name: Organization
+    description: "A company, institution, team, or group the owner works with"
+  - name: Project
+    description: "A work unit the owner pursues (research topic, client job, course, long-term task)"
+  - name: Document
+    description: "A work artifact discussed inside the text (a report, deck, paper, contract)"
+  - name: Event
+    description: "A concrete happening with a date (meeting, deadline, submission, review, trip)"
+  - name: Topic
+    description: "A named subject or theme explicitly stated in the text (for facets and filters)"
+  - name: Artifact
+    description: "A concrete deliverable or tool (dataset, prototype, slide deck, codebase)"
+  - name: Technology
+    description: "A method, framework, model, or tool named as a technique"
+  - name: Place
+    description: "A location (city, campus, office, venue)"
+  - name: TimePeriod
+    description: "A named span of time (Q3 2025, last spring, the 2026 hiring season)"
+  - name: Metric
+    description: "A measured value with meaning (accuracy, budget, revenue, score)"
+  - name: Decision
+    description: "A choice that was made, with its rationale or outcome"
+
+# How entities relate. Directed: "source RELATION target".
+# PART_OF is entity level (person to project). SUPERSEDES is content level
+# (this document replaces that one) and must never be derived from, or derived
+# into, a file version chain (same source path, different revisions).
+relation_types:
+  - name: AUTHORED_BY
+    description: "A document or artifact was written by a person or organization"
+  - name: MENTIONS
+    description: "A document or artifact refers to another entity"
+  - name: PART_OF
+    description: "An entity belongs to a project or event (person to project, artifact to project)"
+  - name: PRODUCES
+    description: "A person, project, or event yields an artifact, document, or metric"
+  - name: USES
+    description: "A person, project, or artifact relies on a technology, artifact, or place"
+  - name: PRECEDES
+    description: "One event or time period happens before another"
+  - name: SUPERSEDES
+    description: "One document replaces another in content (cross-file, judged by text)"
+  - name: RELATES_TO
+    description: "Two entities are related and no sharper relation applies"
+  - name: LOCATED_IN
+    description: "An entity is sited or happens in a place"
+  - name: HAS_METRIC
+    description: "An entity carries a measured value"
+  - name: DECIDED_IN
+    description: "A decision was made in an event or time period"
+
+# Query classes steer HyDE. Keywords are matched against the user's question.
+# Known gap (spec 4.4): the router tokenizes ASCII words only, so Chinese
+# keywords are inert until the Chinese keyword spike lands; keep them for
+# documentation and future use, and do not rely on class routing for Chinese.
+query_classes:
+  - name: locating
+    keywords: [file, find, where, latest, newest, version, report, deck, notes, locate]
+    hyde_instruction: >-
+      Write as a file index entry would: name the file or document, the project
+      it belongs to, where it lives, and what it contains.
+  - name: project
+    keywords: [project, belongs, part, client, course, topic, working, about]
+    hyde_instruction: >-
+      Write as a project dossier would: name the project, its members, its
+      deliverables, and the period it was active.
+  - name: person
+    keywords: [who, person, author, wrote, meeting, contact, colleague, with]
+    hyde_instruction: >-
+      Write as a contact summary would: name the person, their organization,
+      their role, and which documents or events involve them.
+  - name: timeline
+    keywords: [when, timeline, history, last, ago, month, year, progress, busy]
+    hyde_instruction: >-
+      Write as a work journal would: give dates, events in order, and what was
+      produced in each period.
+
+# Fusion weights and per-layer candidate limits. Copied verbatim from the
+# calibrated demo profile: change them only with the evaluation harness
+# watching (sci-rag eval), per the repository rules.
+retrieval:
+  weights:
+    vector: 1.5
+    keyword: 1.0
+    graph: 0.8
+    community: 0.6
+    hyde: 1.2
+  rrf_k: 60
+  candidate_limits:
+    vector: 20
+    keyword: 20
+    graph: 20
+    community: 5
+    hyde: 20
+  graph:
+    min_confidence: 0.0
+    confidence_weighted: false
+    include_citations: false
+  reranker:
+    enabled: false
+    adapter: llm
+    pool: 20
+    timeout_s: 15.0
+
+# Compression defaults are carried over from the shipped profile. The shipped
+# 0.0 floor was validated on the demo corpus only; re-run the paired gate on
+# personal files before trusting it here (spec 4.4, known follow-up).
+compression:
+  enabled: true
+  relevance_floor: 0.0
+  max_tokens_per_chunk: 160

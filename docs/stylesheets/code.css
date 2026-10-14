@@ -1,0 +1,82 @@
+.md-typeset .highlight,
+.md-typeset pre > code {
+  border-radius: var(--srag-radius-sm);
+}
+
+.md-typeset .highlight {
+  overflow: hidden;
+  border: 1px solid var(--srag-border);
+  background: var(--md-code-bg-color);
+}
+
+.md-typeset .highlight pre {
+  margin: 0;
+}
+
+/* Material carries a code block's vertical rhythm on the inner pre, which the
+   rule above zeroes so the code sits flush inside the bordered box. Put that
+   rhythm back on the wrapper: a step that shows a command and then the file it
+   writes renders two blocks in a row, and without this they touch and read as
+   one block with a stray divider. */
+.md-typeset .highlight,
+.md-typeset .highlighttable {
+  margin: 1em 0;
+}
+
+/* Inside a line-numbered table the wrapper is a cell, so its own rhythm belongs
+   to the table above, not to each cell. */
+.md-typeset .highlighttable .highlight {
+  margin: 0;
+}
+
+.md-typeset .highlighttable {
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  box-shadow: none;
+}
+
+/* The filename bar above a titled block. It inherits prose line height from the
+   body, which leaves a one-line label sitting in far more space than it needs,
+   so set the height from the label itself. Only the vertical padding is set:
+   the horizontal padding is what lines the label up with the code beneath it. */
+.md-typeset .highlight .filename,
+.md-typeset .highlighttable .filename {
+  /* Material carries a paragraph's top margin here. Because the wrapper hides
+     overflow, that margin cannot collapse away and instead renders as a band of
+     empty bar above the label, which is most of the height the bar appears to
+     have. */
+  margin-top: 0;
+  padding-top: 0.45em;
+  padding-bottom: 0.45em;
+  color: var(--srag-muted-600);
+  font-weight: 500;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--srag-border);
+  background: var(--srag-surface-soft);
+}
+
+.md-clipboard {
+  color: var(--srag-muted-500);
+  opacity: 0.7;
+}
+
+.highlight:hover .md-clipboard,
+.md-clipboard:focus-visible {
+  opacity: 1;
+}
+
+/* Tight horizontal padding so a code span does not open a visible gap before
+   the punctuation that follows it. */
+.md-typeset :not(pre) > code {
+  padding: 0.05em 0.24em;
+  color: var(--md-code-fg-color);
+  border: 1px solid color-mix(in srgb, var(--srag-border) 70%, transparent);
+  border-radius: 3px;
+}
+
+.md-typeset kbd {
+  color: var(--srag-ink-800);
+  border-color: var(--srag-border-strong);
+  background: var(--srag-surface-soft);
+  box-shadow: 0 1px 0 var(--srag-border-strong);
+}

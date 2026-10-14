@@ -1,0 +1,180 @@
+site_name: Sci RAG Kit
+site_description: Retrieval-augmented generation, built around your scientific domain
+site_author: Sustainability Software Lab
+site_url: https://sustainability-software-lab.github.io/sci-rag-kit/
+repo_url: https://github.com/sustainability-software-lab/sci-rag-kit
+repo_name: sustainability-software-lab/sci-rag-kit
+edit_uri: ""
+copyright: Copyright &copy; 2026 the sci-rag-kit contributors · BSD-3-Clause
+
+docs_dir: docs
+exclude_docs: |
+  planning/
+  aegis/
+  full-stack-development/
+  superpowers/
+  assets/branding/README.md
+  assets/vendor/asciinema-player/README.md
+  assets/vendor/asciinema-player/LICENSE
+not_in_nav: |
+  examples/demo-eval/*.md
+  ROADMAP.md
+  VERSIONING.md
+  GOVERNANCE.md
+  adopters.md
+  adr/*.md
+  contributing.md
+  STYLE.md
+  changelog.md
+
+theme:
+  name: material
+  custom_dir: docs/overrides
+  language: en
+  favicon: assets/branding/icon-sizes/favicon.ico
+  icon:
+    logo: material/flask-outline
+    repo: fontawesome/brands/github
+  font:
+    text: Inter
+    code: IBM Plex Mono
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.indexes
+    - navigation.tracking
+    - navigation.path
+    - navigation.footer
+    - navigation.top
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.code.select
+    - content.code.annotate
+
+nav:
+  - Home:
+      - index.md
+  - Getting started:
+      - get-started.md
+      - Quickstart: quickstart.md
+      - Bring your own domain: bring-your-own-domain.md
+      - Troubleshooting: troubleshooting.md
+  - How it works:
+      - learn.md
+      - FAQ: faq.md
+      - Choosing Sci RAG Kit: choosing-sci-rag-kit.md
+      - Architecture: architecture.md
+      - Methodology: methodology.md
+  - Guides:
+      - guides.md
+      - Evaluate your pipeline: evaluation.md
+      - Run a corpus campaign: campaigns.md
+      - Configure Postgres backend: run-postgres.md
+      - Operate a live corpus: operations.md
+      - Deploy on Google Cloud: deploy-gcp.md
+      - Extend the kit: extend.md
+  - Reference:
+      - reference.md
+      - CLI: cli.md
+      - Configuration: configuration.md
+      - REST, MCP, and Python API: api.md
+      - Benchmarks: benchmarks.md
+      - Glossary: glossary.md
+  - About:
+      - project.md
+
+plugins:
+  - search:
+      lang: en
+
+# Retired pages keep answering at their old address. The map is applied by
+# scripts/docs_redirects.py after the build; a target that does not exist
+# fails `make docs`.
+hooks:
+  - scripts/docs_redirects.py
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets:
+      base_path:
+        - .
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra_javascript:
+  # Vendored, not a CDN: the docs build stays hermetic and the offline link
+  # check can see the asset. See docs/assets/vendor/asciinema-player/README.md.
+  - assets/vendor/asciinema-player/asciinema-player.min.js
+  - javascripts/cast.js
+
+extra_css:
+  - assets/vendor/asciinema-player/asciinema-player.css
+  - stylesheets/tokens.css
+  - stylesheets/typography.css
+  - stylesheets/components.css
+  - stylesheets/code.css
+  - stylesheets/diagrams.css
+  - stylesheets/home.css
+
+extra:
+  generator: false
+  redirects:
+    tour.md: get-started.md#full-project-structure
+    llm-assisted-setup.md: bring-your-own-domain.md#drafting-with-a-model
+    api-clients.md: api.md#generated-clients
+    citation.md: project.md#how-to-cite
+    evidence-and-rights.md: methodology.md#7-scope-precedes-ranking
+  # Pinned to pyproject by tests/unit/test_release_version_claims.py.
+  package_version: "0.5.0"
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/sustainability-software-lab/sci-rag-kit
+      name: Sci RAG Kit on GitHub

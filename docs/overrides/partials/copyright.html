@@ -1,0 +1,22 @@
+{#-
+  The landing page used to draw a footer strip of its own to carry the version
+  and the install route. That put a site-wide fact inside one page's body: it
+  showed on the home page only, and every release had to remember to bump a
+  line of prose in the middle of a Markdown file.
+
+  Carry it here instead, beside the copyright, so every page states the version
+  a reader would install and links to the artefact that ships it. The version
+  comes from `extra.package_version` in `mkdocs.yml`, which a test pins to the
+  version this tree packages.
+-#}
+<div class="md-copyright">
+  {% if config.copyright %}
+    <span class="md-copyright__highlight srag-footer__item">
+      {{ config.copyright }}
+    </span>
+  {% endif %}
+  {% if config.extra.package_version %}
+    <span class="srag-footer__item">v{{ config.extra.package_version }}</span>
+    <a class="srag-footer__item" href="https://pypi.org/project/sci-rag-kit/">Install with pipx</a>
+  {% endif %}
+</div>

@@ -1,0 +1,416 @@
+/* Material requests Inter at 300/400/700 only, so the 500 and 600 weights this
+   stylesheet asks for were being synthesised by the browser rather than drawn.
+   Loading the real cuts is what makes the type match its reference. */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
+/*
+ * Near-monochrome token set.
+ *
+ * One desaturated accent, used only where color carries information: links,
+ * active navigation, focus rings. Neutrals are true greys, not blue-tinted,
+ * so long technical pages read as paper rather than as a product surface.
+ */
+
+/*
+ * Material writes its scheme variables onto <body> through
+ * [data-md-color-scheme], which outranks a bare :root block. Both selectors are
+ * listed so the light scheme wins the same way the slate one does.
+ */
+:root,
+[data-md-color-scheme="default"] {
+  --srag-accent: #2f5fb3;
+  --srag-accent-strong: #234a90;
+
+  --srag-ink-950: #16181d;
+  --srag-ink-900: #24272e;
+  --srag-ink-800: #3f4451;
+  --srag-muted-700: #5c6270;
+  --srag-muted-600: #676d7b;
+  --srag-muted-500: #6e7480;
+
+  --srag-surface: #ffffff;
+  --srag-surface-soft: #fafafa;
+  --srag-surface-tinted: #f4f4f5;
+  --srag-border: #e4e4e7;
+  --srag-border-strong: #d4d4d8;
+  --srag-focus-ring: #2f5fb3;
+
+  --srag-success: #17663f;
+  --srag-warning: #8a4b0a;
+  --srag-danger: #a32236;
+
+  --srag-radius-sm: 4px;
+  --srag-radius-md: 6px;
+  --srag-radius-lg: 8px;
+
+  /* Material header and tab bar: light surface, ink foreground. */
+  --md-primary-fg-color: #ffffff;
+  --md-primary-fg-color--light: #fafafa;
+  --md-primary-fg-color--dark: #f4f4f5;
+  --md-primary-bg-color: var(--srag-ink-900);
+  --md-primary-bg-color--light: var(--srag-muted-600);
+
+  --md-accent-fg-color: var(--srag-accent-strong);
+  --md-typeset-a-color: var(--srag-accent);
+  --md-default-bg-color: var(--srag-surface);
+  --md-default-fg-color: var(--srag-ink-900);
+  --md-default-fg-color--light: var(--srag-muted-700);
+  --md-default-fg-color--lighter: var(--srag-muted-500);
+  --md-code-bg-color: #f6f6f7;
+  --md-code-fg-color: #2b2f38;
+  --md-typeset-table-color: var(--srag-border);
+  --md-typeset-table-color--light: var(--srag-surface-soft);
+  --md-footer-bg-color: var(--srag-surface-soft);
+  --md-footer-bg-color--dark: var(--srag-surface-soft);
+  --md-footer-fg-color: var(--srag-ink-900);
+  --md-footer-fg-color--light: var(--srag-muted-700);
+  --md-footer-fg-color--lighter: var(--srag-muted-500);
+  --md-grid-width: 88rem;
+}
+
+[data-md-color-scheme="slate"] {
+  --srag-accent: #8fb0e8;
+  --srag-accent-strong: #a8c2f0;
+
+  --srag-ink-950: #f0f3f7;
+  --srag-ink-900: #e2e7ee;
+  --srag-ink-800: #c9ced6;
+  --srag-muted-700: #9aa3b0;
+  --srag-muted-600: #8d95a3;
+  --srag-muted-500: #828b99;
+
+  --srag-surface: #0d1117;
+  --srag-surface-soft: #161b22;
+  --srag-surface-tinted: #1c222b;
+  --srag-border: #2a2f37;
+  --srag-border-strong: #3a4049;
+  --srag-focus-ring: #8fb0e8;
+
+  --srag-success: #5fbb85;
+  --srag-warning: #d9a05b;
+  --srag-danger: #e08494;
+
+  /* The header stays dark here; only the light scheme inverts. */
+  --md-primary-fg-color: #0d1117;
+  --md-primary-fg-color--light: #161b22;
+  --md-primary-fg-color--dark: #090d12;
+  --md-primary-bg-color: var(--srag-ink-900);
+  --md-primary-bg-color--light: var(--srag-muted-700);
+
+  --md-code-bg-color: #161b22;
+  --md-code-fg-color: #d5dae2;
+  --md-accent-fg-color: var(--srag-accent-strong);
+  --md-typeset-a-color: var(--srag-accent);
+  --md-default-bg-color: var(--srag-surface);
+  --md-default-fg-color: var(--srag-ink-900);
+  --md-default-fg-color--light: var(--srag-muted-700);
+  --md-default-fg-color--lighter: var(--srag-muted-500);
+  --md-typeset-table-color: var(--srag-border);
+  --md-typeset-table-color--light: var(--srag-surface-soft);
+  --md-footer-bg-color: var(--srag-surface-soft);
+  --md-footer-bg-color--dark: var(--srag-surface-soft);
+  --md-footer-fg-color: var(--srag-ink-900);
+  --md-footer-fg-color--light: var(--srag-muted-700);
+  --md-footer-fg-color--lighter: var(--srag-muted-500);
+}
+
+.md-grid {
+  max-width: var(--md-grid-width);
+}
+
+/* ── Header and tab bar ─────────────────────────────────────────────── */
+
+.md-header {
+  border-bottom: 1px solid var(--srag-border);
+  box-shadow: none;
+}
+
+/* Material raises a drop shadow once the page scrolls; a hairline is enough. */
+.md-header--shadow {
+  box-shadow: none;
+}
+
+/* Material leaves 1rem between the mark and the title, which reads as a gap
+   rather than a lockup once the mark is a single glyph. */
+[dir="ltr"] .md-header__title {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+[dir="ltr"] .md-header__button.md-logo {
+  margin-right: 0;
+  padding-right: 0.15rem;
+}
+
+/* Give the whole left-justified column room to breathe from the window edge. */
+[dir="ltr"] .md-header__inner {
+  padding-left: 0.6rem;
+}
+
+.md-header__title {
+  font-weight: 600;
+}
+
+.md-header__button.md-logo :is(img, svg) {
+  height: 1.35rem;
+}
+
+/* The wordmark links home like the mark does, and picks up the same quiet
+   hover fill the tabs and sidebar rows use. */
+.md-header__brand {
+  display: inline-block;
+  padding: 0.18rem 0.35rem;
+  border-radius: var(--srag-radius-sm);
+  transition: background-color 120ms ease;
+}
+
+.md-header__brand:is(:hover, :focus-visible) {
+  background: var(--srag-surface-soft);
+}
+
+[dir="ltr"] .md-header__title {
+  margin-left: -0.35rem;
+}
+
+.md-header__button.md-logo:hover {
+  opacity: 1;
+}
+
+/* The tabs render inside md-header__inner (see overrides/partials/header.html),
+   so the chrome is one line: brand, sections, then search and the repo link. */
+.md-header__inner {
+  align-items: center;
+}
+
+/* Material stacks two absolutely positioned topics here and swaps them on
+   scroll. Beside the tabs there is no room for that, so the brand stays put
+   and the topics lay out in normal flow, letting the title size to content. */
+/* Material gives the title a fixed 2.4rem height and line-height. Combined
+   with the brand link's own padding that pushed the wordmark below the mark's
+   centre line, so the box is sized to its content and the flex row centres
+   both against each other. */
+.md-header__title {
+  flex-grow: 0;
+  width: auto;
+  height: auto;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.md-header__title,
+.md-header__ellipsis,
+.md-header__topic {
+  display: flex;
+  align-items: center;
+}
+
+.md-header__title > .md-header__ellipsis {
+  width: auto;
+}
+
+.md-header__topic {
+  position: static;
+}
+
+.md-header__topic + .md-header__topic {
+  display: none;
+}
+
+/* Material fades the brand out and swaps in the page title once you scroll.
+   Here the brand is the only thing in that slot, so it stays. */
+.md-header__title--active .md-header__topic {
+  z-index: 0;
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.md-header .md-tabs {
+  overflow: visible;
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0.7rem;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.md-tabs__list {
+  margin-left: 0;
+}
+
+.md-tabs__item {
+  height: auto;
+  padding: 0 0.15rem;
+}
+
+.md-tabs__link {
+  margin-top: 0;
+  padding: 0.28rem 0.45rem;
+  color: var(--srag-muted-700);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  border-radius: var(--srag-radius-sm);
+  opacity: 1;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.md-tabs__link:is(:focus-visible, :hover) {
+  color: var(--srag-ink-950);
+  background: var(--srag-surface-soft);
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--srag-ink-950);
+  font-weight: 600;
+  background: var(--srag-surface-tinted);
+  opacity: 1;
+}
+
+/* ── Search field ───────────────────────────────────────────────────── */
+
+.md-search__form {
+  border: 1px solid var(--srag-border-strong);
+  border-radius: var(--srag-radius-sm);
+  background: var(--srag-surface-soft);
+  transition: border-color 150ms ease, background-color 150ms ease;
+}
+
+.md-search__form:hover {
+  border-color: var(--srag-muted-500);
+  background: var(--srag-surface-soft);
+}
+
+[data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+  border-color: var(--srag-border-strong);
+  border-radius: var(--srag-radius-sm) var(--srag-radius-sm) 0 0;
+  background: var(--md-default-bg-color);
+  box-shadow: none;
+}
+
+[data-md-color-scheme="slate"] .md-search__form {
+  border-color: var(--srag-border-strong);
+  background: var(--srag-surface-soft);
+}
+
+/* Full-screen search on small viewports drops the field border entirely. */
+@media screen and (max-width: 59.984375em) {
+  .md-search__form,
+  [data-md-toggle="search"]:checked ~ .md-header .md-search__form {
+    border: 0;
+    border-radius: 0;
+    background: var(--md-default-bg-color);
+  }
+}
+
+.md-main__inner {
+  gap: 1rem;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────── */
+
+.md-footer,
+.md-footer-meta {
+  border-top: 1px solid var(--srag-border);
+}
+
+.md-footer-meta__inner {
+  --srag-footer-gap: 1rem;
+
+  align-items: center;
+  padding-inline: 1rem;
+  padding-block: 0.45rem;
+}
+
+.md-copyright {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--srag-footer-gap);
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  white-space: nowrap;
+}
+
+.md-copyright__highlight {
+  margin: 0;
+}
+
+.md-social {
+  align-items: center;
+  margin: 0 0 0 var(--srag-footer-gap);
+  padding: 0;
+}
+
+.md-social__link {
+  display: grid;
+  width: 1.4rem;
+  height: 1.4rem;
+  place-items: center;
+}
+
+@media screen and (max-width: 44.984375em) {
+  .md-copyright {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.15rem 1rem;
+    white-space: normal;
+  }
+
+  .md-copyright__highlight {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Prev and next are navigation, so they take the size of the header's section
+   tabs rather than the brand wordmark. Material sets the title at 0.9rem, which
+   is the wordmark's size, and that makes the footer read as content.
+   Material's white-space and max-width stay untouched so long page names still
+   ellipsize instead of wrapping. */
+.md-footer__title {
+  padding: 0 0.7rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.md-footer__direction {
+  color: var(--srag-muted-600);
+  font-size: 0.6rem;
+  opacity: 1;
+}
+
+.md-footer__button.md-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Material's margins are sized for the 18px title. Against 14.4px they leave a
+   band much taller than the text in it, so trade some margin for padding: the
+   band gets shorter and the tap target does not. */
+.md-footer__link {
+  margin-top: 0.5rem;
+  margin-bottom: 0.2rem;
+  padding-block: 0.35rem;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--srag-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

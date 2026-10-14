@@ -1,0 +1,44 @@
+name: link-rot
+
+on:
+  schedule:
+    - cron: "43 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  external-links:
+    name: external-links
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Build the documentation site
+        run: |
+          uv sync --locked --group docs
+          make docs
+      - name: Check external links in Markdown
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --exclude-loopback
+            "**/*.md"
+          fail: true
+      - name: Check external links in the built site
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --exclude-loopback
+            --exclude-path "^site/overrides/"
+            --exclude "^https://sustainability-software-lab[.]github[.]io/"
+            --base-url "https://sustainability-software-lab.github.io/sci-rag-kit/"
+            "site/**/*.html"
+          fail: true

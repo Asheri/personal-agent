@@ -1,0 +1,22 @@
+{
+  "featureSlug": "modelscope-deepseek-providers",
+  "currentStage": "verified",
+  "nextAllowedStage": "released",
+  "approvals": {
+    "requirementsApproved": true,
+    "visualDesignApproved": null,
+    "implementationApproved": true,
+    "verificationApproved": true
+  },
+  "lifecycleHooks": {
+    "status": "unavailable",
+    "reason": "The lifecycle MCP tools are not registered in this session; manual artifacts are retained as fallback evidence."
+  },
+  "blockedGates": [],
+  "changePolicy": {
+    "latestChangeId": "001",
+    "stageRegressionRequired": false
+  },
+  "flowProfile": "strict-fullstack",
+  "visualsRequired": false
+}

@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1360" height="600" viewBox="30 130 1360 600" role="img" aria-labelledby="title desc">
+  <title id="title">Sci RAG Kit evidence pipeline</title>
+  <desc id="desc">Scientific papers, reports, and tables are parsed and chunked into Postgres. Five retrieval layers are fused into cited answers, and evaluation measures the result.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,4.5 L0,9 Z" fill="#a1a4ac"/>
+    </marker>
+    <style>
+      .eyebrow { font: 500 13px Inter, system-ui, sans-serif; fill: #6e7480; }
+      .label { font: 600 18px Inter, system-ui, sans-serif; fill: #16181d; }
+      .copy { font: 400 14px Inter, system-ui, sans-serif; fill: #5c6270; }
+      .pill { font: 500 13px Inter, system-ui, sans-serif; fill: #3f4451; }
+      .stage { fill: #ffffff; stroke: #e4e4e7; stroke-width: 1.5; }
+      .chip { fill: #f4f4f5; }
+      .ink { fill: none; stroke: #9b9ea6; stroke-width: 2.5; }
+      .hair { fill: #f7f7f8; stroke: #d4d4d8; stroke-width: 1.5; }
+      .flow { fill: none; stroke: #a1a4ac; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <!-- Scientific sources -->
+  <g transform="translate(54 154)">
+    <rect class="stage" width="258" height="476" rx="12"/>
+    <text x="28" y="42" class="eyebrow">Input</text>
+    <text x="28" y="73" class="label">Scientific sources</text>
+    <text x="28" y="99" class="copy">Files stay traceable.</text>
+    <g transform="translate(28 138)">
+      <rect class="hair" width="68" height="84" rx="6"/>
+      <path d="M15 20h38M15 31h29M15 46h38M15 57h23" class="ink" stroke-linecap="round"/>
+      <path d="M49 0v18h19" fill="#eaeaec" stroke="#d4d4d8" stroke-width="1.5"/>
+      <text x="87" y="35" class="pill">Papers</text>
+      <text x="87" y="57" class="copy">PDF · Markdown</text>
+    </g>
+    <g transform="translate(28 256)">
+      <!-- Symmetric about x=41: neck walls at 27 and 55, lip and body centred
+           on the same axis. The lip used to run 20..48 against a neck at
+           27..55, so it overhung one side and fell short on the other. -->
+      <path d="M27 4v25L10 63c-4 9 2 17 12 17h38c10 0 16-8 12-17L55 29V4" fill="#f7f7f8" stroke="#9b9ea6" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M23 4h36" class="ink" stroke-linecap="round"/>
+      <path d="M17 58h48" class="ink"/>
+      <circle cx="31" cy="49" r="4" fill="#c4c6cb"/>
+      <circle cx="50" cy="67" r="5" fill="#b4b6bc"/>
+      <text x="87" y="35" class="pill">Reports</text>
+      <text x="87" y="57" class="copy">Methods · Results</text>
+    </g>
+    <g transform="translate(28 372)">
+      <rect class="hair" x="2" y="5" width="68" height="70" rx="6"/>
+      <path d="M2 29h68M25 5v70M48 5v70" fill="none" stroke="#d4d4d8" stroke-width="1.5"/>
+      <text x="87" y="35" class="pill">Tables</text>
+      <text x="87" y="57" class="copy">Structure intact</text>
+    </g>
+  </g>
+
+  <path class="flow" d="M312 345 C330 345 330 345 348 345"/>
+
+  <!-- Ingestion -->
+  <g transform="translate(350 194)">
+    <rect class="stage" width="242" height="302" rx="12"/>
+    <text x="28" y="46" class="eyebrow">Ingestion</text>
+    <text x="28" y="77" class="label">Parse and chunk</text>
+    <text x="28" y="106" class="copy">Structure-aware blocks</text>
+    <g transform="translate(28 138)">
+      <rect class="chip" width="186" height="42" rx="6"/>
+      <circle cx="21" cy="21" r="5" fill="#9b9ea6"/>
+      <text x="39" y="26" class="pill">Section paths</text>
+      <rect class="chip" y="53" width="186" height="42" rx="6"/>
+      <circle cx="21" cy="74" r="5" fill="#9b9ea6"/>
+      <text x="39" y="79" class="pill">Source metadata</text>
+      <rect class="chip" y="106" width="186" height="42" rx="6"/>
+      <circle cx="21" cy="127" r="5" fill="#9b9ea6"/>
+      <text x="39" y="132" class="pill">License class</text>
+    </g>
+  </g>
+
+  <path class="flow" d="M592 345 C610 345 610 345 628 345"/>
+
+  <!-- Postgres -->
+  <g transform="translate(630 194)">
+    <rect class="stage" width="268" height="302" rx="12"/>
+    <text x="28" y="46" class="eyebrow">Database</text>
+    <text x="28" y="77" class="label">Postgres</text>
+    <text x="28" y="106" class="copy">Every index, one source of truth</text>
+    <g transform="translate(28 135)">
+      <!-- Four bands of exactly 21, measured rim to rim. The silhouette is one
+           closed path, the rims share one arc shape, and the lid is drawn last
+           so it sits on top the way a lid does. -->
+      <path d="M0 11c0-6 19-11 42-11s42 5 42 11v84c0 6-19 11-42 11c-23 0-42-5-42-11z" fill="#f7f7f8" stroke="#9b9ea6" stroke-width="1.5"/>
+      <path d="M0 32c0 6 19 11 42 11s42-5 42-11" fill="none" stroke="#9b9ea6" stroke-width="1.5"/>
+      <path d="M0 53c0 6 19 11 42 11s42-5 42-11" fill="none" stroke="#9b9ea6" stroke-width="1.5"/>
+      <path d="M0 74c0 6 19 11 42 11s42-5 42-11" fill="none" stroke="#9b9ea6" stroke-width="1.5"/>
+      <ellipse cx="42" cy="11" rx="42" ry="11" fill="#eaeaec" stroke="#9b9ea6" stroke-width="1.5"/>
+      <g transform="translate(124 10)">
+        <path d="M11 28L45 9l34 19v38L45 85 11 66Z" fill="#f7f7f8" stroke="#9b9ea6" stroke-width="1.5"/>
+        <circle cx="45" cy="24" r="6" fill="#9b9ea6"/>
+        <circle cx="26" cy="55" r="6" fill="#b4b6bc"/>
+        <circle cx="64" cy="55" r="6" fill="#b4b6bc"/>
+        <path d="M40 30L30 48M50 30l10 18M33 55h24" stroke="#b4b6bc" stroke-width="1.5"/>
+      </g>
+      <text x="0" y="122" class="pill">Vectors · Full-text search</text>
+      <text x="0" y="142" class="pill">Knowledge graph</text>
+    </g>
+  </g>
+
+  <path class="flow" d="M898 345 C916 345 916 345 934 345"/>
+
+  <!-- Retrieval -->
+  <g transform="translate(936 154)">
+    <rect class="stage" width="300" height="382" rx="12"/>
+    <text x="28" y="46" class="eyebrow">Retrieval</text>
+    <text x="28" y="77" class="label">Five fused layers</text>
+    <text x="28" y="105" class="copy">Scope is applied before ranking.</text>
+    <g transform="translate(28 137)">
+      <rect class="chip" width="116" height="38" rx="6"/><text x="58" y="24" class="pill" text-anchor="middle">Vector</text>
+      <rect class="chip" x="128" width="116" height="38" rx="6"/><text x="186" y="24" class="pill" text-anchor="middle">Keyword</text>
+      <rect class="chip" y="50" width="116" height="38" rx="6"/><text x="58" y="74" class="pill" text-anchor="middle">Knowledge graph</text>
+      <rect class="chip" x="128" y="50" width="116" height="38" rx="6"/><text x="186" y="74" class="pill" text-anchor="middle">Community</text>
+      <rect class="chip" x="46" y="100" width="152" height="38" rx="6"/><text x="122" y="124" class="pill" text-anchor="middle">Hypothetical answer</text>
+      <path d="M20 168h204" fill="none" stroke="#c4c6cb" stroke-width="2" stroke-linecap="round"/>
+      <text x="122" y="194" class="pill" text-anchor="middle">Weighted reciprocal rank fusion</text>
+      <text x="122" y="214" class="pill" text-anchor="middle">Then re-rank</text>
+    </g>
+  </g>
+
+  <path class="flow" d="M1236 315 C1252 315 1252 315 1270 315"/>
+
+  <!-- Cited answer -->
+  <g transform="translate(1274 230)">
+    <rect class="stage" width="92" height="172" rx="12"/>
+    <circle cx="46" cy="43" r="20" fill="#ffffff" stroke="#2f5fb3" stroke-width="1.5"/>
+    <path d="M36 43l7 7 14-17" fill="none" stroke="#2f5fb3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="46" y="90" class="pill" text-anchor="middle">Cited</text>
+    <text x="46" y="111" class="pill" text-anchor="middle">answer</text>
+    <text x="46" y="140" class="copy" text-anchor="middle">[1] [2]</text>
+  </g>
+
+  <!-- Retrieval and Evaluation share a centre line at x=1086, so the two edges
+       between them run straight down, evenly spaced either side of it. -->
+  <path class="flow" d="M1031 538 V580"/>
+  <path class="flow" d="M1141 538 V580"/>
+
+  <!-- Evaluation -->
+  <g transform="translate(936 584)">
+    <rect class="stage" width="300" height="124" rx="12"/>
+    <text x="28" y="40" class="eyebrow">Evaluation</text>
+    <text x="28" y="71" class="label">Ablations and judging</text>
+    <text x="28" y="94" class="copy">Confidence intervals · Calibration</text>
+  </g>
+</svg>

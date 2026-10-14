@@ -1,0 +1,19 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message-version": "1.0.0",
+  "message": {
+    "DOI": "10.1021/am300292v",
+    "container-title": ["ACS Applied Materials &amp; Interfaces"],
+    "is-referenced-by-count": 0,
+    "updated-by": [
+      {
+        "DOI": "10.1021/acsami.9b11759",
+        "type": "retraction",
+        "label": "Retraction",
+        "source": "retraction-watch",
+        "record-id": "20946"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+# Optional but recommended: `uvx pre-commit install` once, and these run
+# on every commit. CI also runs every configured hook on the whole tree.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        # MkDocs intentionally uses a Python-specific YAML tag for its
+        # superfence formatter. The required docs job parses that file and
+        # builds the site strictly; check-yaml still covers ordinary YAML.
+        exclude: ^mkdocs[.]yml$
+      - id: check-json
+      - id: check-added-large-files
+        args: [--maxkb=600]
+      - id: check-merge-conflict

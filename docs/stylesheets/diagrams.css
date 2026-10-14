@@ -1,0 +1,60 @@
+/*
+ * Mermaid reads its palette from these variables at render time. Left unset,
+ * Material's defaults draw indigo-tinted nodes, which is the one saturated
+ * colour the rest of the site no longer uses.
+ */
+:root,
+[data-md-color-scheme="default"] {
+  --md-accent-fg-color--transparent: #2f5fb314;
+  --md-mermaid-node-bg-color: #fafafa;
+  --md-mermaid-node-fg-color: #9b9ea6;
+  --md-mermaid-edge-color: #8e939c;
+  --md-mermaid-label-bg-color: #ffffff;
+  --md-mermaid-label-fg-color: #3f4451;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-accent-fg-color--transparent: #8fb0e824;
+  --md-mermaid-node-bg-color: #171d26;
+  --md-mermaid-node-fg-color: #4a515c;
+  --md-mermaid-edge-color: #737b87;
+  --md-mermaid-label-bg-color: #0d1117;
+  --md-mermaid-label-fg-color: #c9ced6;
+}
+
+.md-typeset figure {
+  margin: 1.8rem 0;
+}
+
+.md-typeset figure > img,
+.md-typeset figure > svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 0.6rem;
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  background: var(--srag-surface);
+}
+
+.md-typeset figure > figcaption {
+  max-width: 36rem;
+  margin: 0.65rem auto 0;
+  font-style: normal;
+  text-align: center;
+}
+
+.mermaid {
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  padding: 1rem;
+  text-align: center;
+  border: 1px solid var(--srag-border);
+  border-radius: var(--srag-radius-sm);
+  background: var(--srag-surface);
+}
+
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}

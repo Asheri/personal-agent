@@ -1,0 +1,48 @@
+{#-
+  The stock partial draws nothing unless a page sits two sections deep, and even
+  then it stops at the page's parent. On this site that left most pages with a
+  single crumb repeating the section name already lit in the tab bar above it,
+  and told you nothing about where in the section you had landed.
+
+  Draw the whole path instead: every ancestor section, then the page itself,
+  each labelled the way the left sidebar labels it, so the trail reads as the
+  route you would have clicked to get here.
+
+  A section hub page is the exception. It opens its section and carries its
+  section's name, so its trail would be one crumb saying the title printed
+  directly below it and linking to the page you are already on. Those pages, and
+  the few that are built outside the nav, keep the row and drop the crumbs: the
+  row's fixed height is what holds every page title at the same height.
+-#}
+{% import "partials/path-item.html" as item with context %}
+{% if page.meta and page.meta.hide %}
+  {% set hidden = "hidden" if "path" in page.meta.hide %}
+{% endif %}
+{% set section = page.parent %}
+{#- A hub page opens its section and carries its section's name. Both halves
+    matter: the first decision record also opens its section, but it is called
+    something else, so it is an ordinary page with an ordinary trail. -#}
+{% set hub = section
+  and section.children
+  and (section.children | first) == page
+  and page.title == section.title %}
+{% set ancestry = page.ancestors | reverse | list %}
+{% set trail = ancestry[:-1] if hub else ancestry %}
+{% if trail %}
+  <nav class="md-path" aria-label="Breadcrumb" {{ hidden }}>
+    <ol class="md-path__list">
+      {% for nav_item in trail %}
+        {{ item.render(nav_item) }}
+      {% endfor %}
+      {% if not hub %}
+        <li class="md-path__item">
+          <a href="{{ page.url | url }}" class="md-path__link" aria-current="page">
+            <span class="md-ellipsis">{{ page.title }}</span>
+          </a>
+        </li>
+      {% endif %}
+    </ol>
+  </nav>
+{% else %}
+  <div class="md-path" aria-hidden="true" {{ hidden }}></div>
+{% endif %}

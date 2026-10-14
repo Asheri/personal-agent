@@ -1,0 +1,121 @@
+/*
+ * Material sets the root font size to 125%, so 0.83rem renders at about
+ * 16.6px. Sizes below are computed against that, not against 16px.
+ */
+
+.md-typeset {
+  color: var(--srag-ink-800);
+  font-size: 0.83rem;
+  line-height: 1.62;
+}
+
+.md-content__inner {
+  width: calc(100% - 1.6rem);
+  max-width: 42rem;
+  margin-inline: auto;
+  padding-top: 0.4rem;
+  padding-bottom: 4rem;
+}
+
+/* Material reserves a wide gap above the first heading; the hairline under the
+   header already separates the chrome, so the page can start closer to it. */
+.md-content__inner > :first-child {
+  margin-top: 0;
+}
+
+.md-content__inner::before {
+  display: none;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--srag-ink-950);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.md-typeset h1 {
+  margin-bottom: 0.75rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+.md-typeset h2 {
+  margin-top: 2.4rem;
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+
+.md-typeset h3 {
+  margin-top: 1.8rem;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.md-typeset h4 {
+  font-size: 0.9rem;
+}
+
+/* The grey one-line description under a page title. */
+.md-typeset > p:first-of-type {
+  color: var(--srag-muted-700);
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.md-typeset a:not(.srag-row) {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 32%, transparent);
+  text-decoration-thickness: 0.06em;
+  text-underline-offset: 0.16em;
+}
+
+.md-typeset a:not(.srag-row):hover {
+  text-decoration-color: currentColor;
+}
+
+.md-typeset strong {
+  color: var(--srag-ink-900);
+  font-weight: 600;
+}
+
+.md-typeset small,
+.md-typeset figcaption {
+  color: var(--srag-muted-600);
+  font-size: 0.72rem;
+}
+
+.md-nav,
+.md-header,
+.md-tabs {
+  font-weight: 500;
+}
+
+.md-nav__title,
+.md-nav__item--section > .md-nav__link {
+  font-weight: 600;
+}
+
+.md-typeset code,
+.md-typeset kbd,
+.md-typeset pre {
+  font-size: 0.88em;
+  line-height: 1.55;
+}
+
+@media screen and (max-width: 44.984375em) {
+  .md-typeset {
+    font-size: 0.8rem;
+  }
+
+  .md-typeset h1 {
+    font-size: 1.55rem;
+  }
+
+  .md-content__inner {
+    padding-bottom: 2.5rem;
+  }
+}

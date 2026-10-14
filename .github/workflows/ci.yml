@@ -1,0 +1,236 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: sci_rag_test
+          POSTGRES_USER: sci_rag
+          POSTGRES_PASSWORD: sci_rag
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U sci_rag -d sci_rag_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      SCI_RAG_TEST_DATABASE_URL: postgresql+asyncpg://sci_rag:sci_rag@localhost:5433/sci_rag_test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: The lockfile matches pyproject.toml
+        # Before `uv sync`, which would rewrite a stale lock in the runner
+        # and make this pass whatever was actually committed.
+        run: uv lock --check
+      - name: Install dependencies
+        # The provider extras are light and carry the LLM adapters' tests, so
+        # CI installs them rather than skipping that coverage.
+        run: uv sync --extra anthropic --extra openai
+      - name: Lint
+        run: |
+          uv run ruff check src tests examples scripts
+          uv run ruff format --check src tests examples scripts
+      - name: Type check
+        run: uv run mypy
+      - name: Tests (unit + integration + smoke eval, with coverage floor)
+        run: uv run pytest -q --cov=sci_rag --cov-report=term --cov-fail-under=78
+
+  pre-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+      - name: Every configured hook, the way CONTRIBUTING documents them
+        run: uvx pre-commit run --all-files --show-diff-on-failure
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the server image
+        run: docker build -t sci-rag-kit:ci .
+      - name: Image smoke (CLI runs inside the container)
+        run: docker run --rm sci-rag-kit:ci sci-rag --help
+      - name: The image carries its documented runtime inputs
+        run: |
+          docker run --rm sci-rag-kit:ci python -c "import sci_rag; print(sci_rag.__file__)"
+          docker run --rm sci-rag-kit:ci test -f /app/domain/domain.yaml
+          docker run --rm sci-rag-kit:ci test -f /app/alembic.ini
+          docker run --rm sci-rag-kit:ci test -d /app/migrations
+      # tests/unit/test_build_context.py holds the manifest shape. This step
+      # is the part no unit test can do: ask Docker itself what it admitted.
+      # The sentinels are synthetic and are created here, never read from a
+      # real workspace.
+      - name: Local state cannot reach a build context
+        run: |
+          mkdir -p .cloudsql .context data/raw
+          printf 'synthetic-not-a-secret\n' > .env
+          printf 'synthetic-not-a-secret\n' > .cloudsql/password
+          printf 'agent state\n' > .context/sentinel.txt
+          printf 'private corpus\n' > data/raw/private-sentinel.txt
+          printf 'FROM busybox:1.36\nCOPY . /audit-context\n' > Dockerfile.context-audit
+          docker build -f Dockerfile.context-audit -t sci-rag-kit:context-audit .
+          failed=0
+          for path in .env .cloudsql/password .context/sentinel.txt data/raw/private-sentinel.txt; do
+            if docker run --rm sci-rag-kit:context-audit test -e "/audit-context/$path"; then
+              echo "::error::$path reached the Docker build context"
+              failed=1
+            else
+              echo "excluded from the build context: $path"
+            fi
+          done
+          for path in pyproject.toml uv.lock alembic.ini src domain migrations; do
+            if docker run --rm sci-rag-kit:context-audit test -e "/audit-context/$path"; then
+              echo "admitted, as the image needs: $path"
+            else
+              echo "::error::$path is missing from the build context"
+              failed=1
+            fi
+          done
+          # Bytecode sits inside the admitted directories, so the allowlist
+          # alone cannot exclude it. actions/checkout gives a clean tree, so
+          # compile some first or this proves nothing. See #196.
+          python3 -m compileall -q src migrations domain > /dev/null 2>&1 || true
+          docker build -f Dockerfile.context-audit -t sci-rag-kit:context-audit-pyc .
+          found=$(docker run --rm sci-rag-kit:context-audit-pyc \
+            find /audit-context -name '*.pyc' -o -name '__pycache__' | head -5)
+          if [ -n "$found" ]; then
+            echo "::error::bytecode reached the build context: $found"
+            failed=1
+          else
+            echo "no bytecode reached the build context"
+          fi
+          rm -f Dockerfile.context-audit
+          exit "$failed"
+
+  terraform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - name: Format check
+        run: terraform fmt -check -diff -recursive
+      - name: Validate
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform -chdir=dev-database init -backend=false -input=false
+          terraform -chdir=dev-database validate
+      # tests/unit/test_dev_database_terraform.py holds the static contract.
+      # This step is the part no unit test can do: ask Terraform itself
+      # whether it refuses before it can plan a mutation. See #171.
+      - name: The development module refuses to guess what it targets
+        run: |
+          failed=0
+          if terraform -chdir=dev-database plan -input=false \
+              -var 'developer_principal=user:nobody@example.invalid' \
+              > plan-without-target.log 2>&1; then
+            echo "::error::the module planned without being told what to target"
+            failed=1
+          fi
+          for required in project_id instance_name; do
+            # Terraform wraps its output, so match only the stable opening.
+            if grep -q "input variable \"$required\" is not set" plan-without-target.log; then
+              echo "refused before planning, no default: $required"
+            else
+              echo "::error::$required did not stop the run"
+              failed=1
+            fi
+          done
+          if terraform -chdir=dev-database plan -input=false \
+              -var 'project_id=Not A Project' \
+              -var 'instance_name=my-dev-instance' \
+              -var 'developer_principal=user:nobody@example.invalid' \
+              > plan-bad-project.log 2>&1; then
+            echo "::error::a malformed project id was accepted"
+            failed=1
+          else
+            grep -q "project_id must be a Google Cloud project id" plan-bad-project.log \
+              && echo "malformed project id rejected with a usable message" \
+              || { echo "::error::validation message missing"; failed=1; }
+          fi
+          rm -f plan-without-target.log plan-bad-project.log
+          exit "$failed"
+
+  docs-links:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check internal documentation links
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Offline: internal file links only, so external-site flake can
+          # never break the build.
+          args: --offline --no-progress "**/*.md"
+          fail: true
+
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install project and documentation dependencies
+        # docs-test carries Playwright for the rendered-geometry guard below.
+        run: uv sync --group docs --group docs-test
+      - name: Check and build documentation exactly as contributors do
+        run: make docs
+      - name: Install the browser the geometry guard measures with
+        run: uv run playwright install --with-deps chromium
+      - name: Measure the built site's page head and code snippets
+        # Reads site/ from the build above. Geometry is what the Markdown-level
+        # guard in tests/unit cannot see. The page-head module comes along
+        # because its breadcrumb assertions render the site with MkDocs, so
+        # they skip in the checks job, which deliberately installs no docs
+        # group. This is the only job where they run.
+        run: uv run pytest tests/docs tests/unit/test_docs_page_head.py -q
+      - name: Upload documentation preview
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-preview
+          path: site/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Download the documentation preview without publishing
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@v8
+        with:
+          name: docs-preview
+          path: ${{ runner.temp }}/docs-preview-roundtrip
+      - name: The documentation preview survives the artifact round trip
+        if: github.event_name == 'pull_request'
+        run: diff -qr site/ "$RUNNER_TEMP/docs-preview-roundtrip/"

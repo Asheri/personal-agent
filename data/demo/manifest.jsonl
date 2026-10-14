@@ -1,0 +1,7 @@
+# The offline demo corpus: five synthetic documents about agricultural
+# residues. Written for this kit, CC0, with plausible but fictional numbers.
+{"path": "fixture/colusa-rice-straw-2023.md", "title": "Colusa Basin Rice Straw Resource Assessment 2023", "authors": ["Demo Region Biomass Office"], "year": 2023, "license_class": "public", "source": "demo_fixture"}
+{"path": "fixture/almond-prunings-logistics.md", "title": "Almond Pruning and Orchard Residue Logistics Guide", "authors": ["Demo Region Extension Service"], "year": 2023, "license_class": "public", "source": "demo_fixture"}
+{"path": "fixture/anaerobic-digestion-primer.md", "title": "Anaerobic Digestion of Crop Residues: A Working Primer", "authors": ["Demo Region Bioenergy Lab"], "year": 2024, "license_class": "public", "source": "demo_fixture"}
+{"path": "fixture/gasification-walnut-shells.md", "title": "Small-Scale Gasification of Walnut Shells and Orchard Chips", "authors": ["Demo Region Bioenergy Lab"], "year": 2024, "license_class": "public", "source": "demo_fixture"}
+{"path": "fixture/central-valley-residue-policy.md", "title": "Demo Region Policy Landscape for Agricultural Residue Utilization", "authors": ["Demo Region Policy Desk"], "year": 2024, "license_class": "public", "source": "demo_fixture"}

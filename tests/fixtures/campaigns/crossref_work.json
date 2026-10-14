@@ -1,0 +1,17 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.7717/peerj.4375",
+    "title": [
+      "The state of OA: a large-scale analysis of the prevalence and impact of Open Access articles"
+    ],
+    "author": [
+      {"given": "Heather", "family": "Piwowar"},
+      {"given": "Jason", "family": "Priem"}
+    ],
+    "published": {"date-parts": [[2018, 2, 13]]},
+    "container-title": ["PeerJ"],
+    "license": [{"URL": "https://creativecommons.org/licenses/by/4.0/"}]
+  }
+}

@@ -1,0 +1,35 @@
+# What Docker is allowed to see when it builds this repository.
+#
+# The rule is fail closed: exclude everything, then re-admit exactly the
+# inputs the build documents. A denylist would leak the next ignored
+# directory somebody adds, because nothing would remind them to name it
+# here. See docs/deploy-gcp.md and tests/unit/test_build_context.py.
+#
+# A checkout also holds credentials under .cloudsql/, agent working files
+# under .context/, a filled in .env, a local PostgreSQL cluster under
+# .pgdata/, Terraform state that contains a generated database password,
+# and whatever corpus was last ingested under data/raw/. None of that
+# belongs in a build context, local or remote.
+#
+# .gcloudignore admits the same set, so a local build and a Cloud Build
+# submission see the same directory. Adding a COPY to the Dockerfile means
+# adding its source to both.
+
+*
+
+!pyproject.toml
+!uv.lock
+!README.md
+!alembic.ini
+!src
+!domain
+!migrations
+!Dockerfile
+!.dockerignore
+
+# Bytecode lives inside the directories above, so it survives the allowlist
+# and would carry one developer's .pyc into the image. Re-excluded by name
+# to keep that exception visible.
+**/__pycache__
+**/*.pyc
+**/*.pyo

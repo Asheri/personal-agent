@@ -1,0 +1,19 @@
+{
+  "name": "sci-rag-kit",
+  "dockerComposeFile": ["../docker-compose.yml", "compose.yml"],
+  "service": "app",
+  "workspaceFolder": "/workspaces/sci-rag-kit",
+  "features": {
+    "ghcr.io/va-h/devcontainers-features/uv:1": {}
+  },
+  "postCreateCommand": "uv sync && uv run sci-rag db upgrade",
+  "forwardPorts": [8000],
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "charliermarsh.ruff"],
+      "settings": {
+        "python.defaultInterpreterPath": "${containerWorkspaceFolder}/.venv/bin/python"
+      }
+    }
+  }
+}

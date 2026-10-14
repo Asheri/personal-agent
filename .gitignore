@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+.python-version.local
+
+# Environments and secrets
+.env
+.env.*
+!.env.example
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Your corpus lives here, not in git (see docs/bring-your-own-domain.md)
+data/raw/*
+data/interim/*
+data/processed/*
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/processed/.gitkeep
+
+# Downloaded demo documents (fetched by scripts/fetch_demo_corpus.py)
+data/demo/downloads/
+
+# Evaluation outputs
+eval_results/
+
+# Database dumps (docs/operations.md). A dump holds every source and chunk,
+# so for a private corpus the file is the corpus.
+backups/*
+!backups/.gitkeep
+*.dump
+
+# Docs site build
+site/
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/*.tfstate*
+infra/terraform/*.tfvars
+!infra/terraform/example.tfvars
+infra/terraform/**/.terraform/
+infra/terraform/**/*.tfstate*
+infra/terraform/**/*.tfvars
+
+# Docker-free local database (scripts/local_postgres.py). A cluster under
+# the project root is a corpus waiting to be committed by accident.
+.pgdata/
+.pgdata.log
+
+# Workspace-scoped Cloud SQL proxy state and cached credentials.
+.cloudsql/
+
+# Agent scratch space. Holds working notes and captured infrastructure
+# inventories, so it must never be committed. A local .git/info/exclude does
+# not survive a fresh clone; this rule does.
+.context/
+
+# OS noise
+.DS_Store
+
+# Project-local git worktrees (using-git-worktrees)
+.worktrees/
