@@ -13,7 +13,9 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/sci-rag-kit` (main worktree).
   `docker-compose.yml`, `mkdocs.yml`, `.github/`, `.pre-commit-config.yaml`,
   `.gitignore`, `.dockerignore`, `.python-version`, and the root docs.
 - **Excluded on purpose**: `.git/` (fresh history here), `.venv/`, `.worktrees/`,
-  `site/`, `backups/`, `data/raw/` (331 MB of downloaded papers), `data/interim/`,
+  `site/`, `backups/` contents (the tracked `backups/.gitkeep` marker is kept:
+  `test_docs_backup_runbook` requires the directory in a fresh checkout),
+  `data/raw/` (331 MB of downloaded papers), `data/interim/`,
   `data/processed/`, all `__pycache__`/`.pyc`, and `.env` (**contains local
   credentials; never copy, never commit**). `.env.example` is included.
 - Package name and CLI kept as `sci_rag` / `sci-rag`: the fork keeps upstream
