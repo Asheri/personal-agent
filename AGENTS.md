@@ -1,635 +1,277 @@
-# Repository instructions for coding agents
+# AGENTS.md: personal-agent 项目协作指南（PC-Mem）
 
-## Scope and precedence
+> 本文件是项目的**总入口与协作契约**，面向所有人类协作者与 AI 编码代理。
+> 配套文件：[MIGRATION.md](MIGRATION.md)（迁移台账）、
+> [docs/superpowers/specs/](docs/superpowers/specs/)（设计规格与审阅记录）。
+> 上游 sci-rag-kit 的 AGENTS.md（代码运营合同）已按项目决定移除，原件保留在源仓库；
+> 其仍然有效的测试/风格/文档纪律已收进本文件 §3 与 §4。
+> 台账与治理条款是活文档：任务状态变化与审阅记录请及时更新本文件。
 
-This file applies to the entire repository. A more deeply nested `AGENTS.md`, if one is added
-later, may refine these instructions for its subtree. Direct user instructions take precedence
-over repository guidance.
+---
 
-> **Fork note (personal-agent).** This tree is the PC-Mem main repository: a fork of
-> sci-rag-kit plus `plugins/`, `memory/`, and `domain-personal/` (the GenericAgent
-> memory face and the personal file space domain). Migration provenance lives in
-> [MIGRATION.md](MIGRATION.md). The personal additions are domain semantics and
-> agent-facing assets only: the operating contract below still governs all changes
-> to `src/sci_rag/`, tests, and docs.
->
-> **Spec governance.** The design baseline is
-> `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` (v1.1). Any improvement or
-> change derived from that spec (concepts C-1 to C-13, storage contract, scope and
-> privacy, feature behavior, acceptance criteria A1 to A7) requires a secondary review
-> by a non-author before merge. Process and task ledger: see [AGENT.md](AGENT.md),
-> section 5 and section 6.
+## 1. 项目定位
 
-Treat this file as an operating contract, not as a substitute for the project documentation.
-Before changing an unfamiliar subsystem, read the nearest relevant source of truth:
+**PC-Mem（全 PC 文件管理记忆系统）**：让 Agent 长期理解个人电脑上的异构文件（论文、PPT、
+Word、代码、数据、图片、会议记录、邮件），不仅「找到相似内容」，还能回答「这份材料属于
+哪个项目」「哪个是最新版本」「之前在哪个项目里做过类似的事」，并随着新文件持续更新知识。
 
-- [README.md](README.md) for the product overview and supported workflows.
-- [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution bar.
-- [docs/architecture.md](docs/architecture.md) for module boundaries and extension seams.
-- [docs/methodology.md](docs/methodology.md) for the scientific and retrieval specification.
-- [docs/STYLE.md](docs/STYLE.md) for the documentation standard, which assigns every page a type.
-- [docs/glossary.md](docs/glossary.md) for the vocabulary this project holds itself to.
-- [docs/adr/](docs/adr/) for accepted architectural decisions, currently 0001 through 0012.
-- [docs/planning/](docs/planning/) and [docs/superpowers/](docs/superpowers/) for design records.
-  Both are excluded from the built site and are history, so do not edit them to match new
-  behavior; supersede them instead.
-- [.github/workflows/ci.yml](.github/workflows/ci.yml) for the authoritative CI commands.
+三层职责（完整架构见规格 §1）：
 
-If documentation and implementation disagree, do not silently choose whichever is convenient.
-Determine which one represents intended current behavior, make the smallest coherent correction,
-and call out the discrepancy in the handoff or pull request.
-
-## Mission and quality bar
-
-Sci RAG Kit is a Python template for scientific retrieval-augmented generation. It ingests
-scientific documents, builds a Postgres-native knowledge graph, performs scoped hybrid retrieval,
-generates cited answers, evaluates those answers, and exposes the same behavior through CLI, REST,
-and MCP surfaces.
-
-Changes must preserve more than functional output. They must preserve traceability, scientific
-honesty, access-control boundaries, citation provenance, reproducibility, and graceful but visible
-degradation. Prefer a narrow, well-tested change over a broad cleanup. Never make a metric look
-better by weakening a threshold, hiding a failed stage, broadening retrieval scope, or changing the
-evaluation target without explicit justification and evidence.
-
-## Repository map
-
-| Path | Responsibility |
-| --- | --- |
-| `src/sci_rag/config.py` | `SCI_RAG_*` runtime settings, provider selection, and credential resolution |
-| `src/sci_rag/domain.py` and `domain/` | Domain profile loader, prompts, retrieval tuning, and evaluation seeds |
-| `src/sci_rag/db/` and `migrations/` | SQLAlchemy models, async engine, and Alembic schema history |
-| `src/sci_rag/ingest/` | Parsing, structure-aware chunking, manifests, deduplication, and ingestion |
-| `src/sci_rag/embed/` and `src/sci_rag/llm/` | Provider interfaces and implementations |
-| `src/sci_rag/graph/` | Entity and relationship extraction, entity resolution, and community summaries |
-| `src/sci_rag/retrieve/` | Retrieval stages, scope enforcement, fusion, routing, reranking, and profiling |
-| `src/sci_rag/answer/` | Grounded answer generation, streaming events, citations, and source compression |
-| `src/sci_rag/evals/` | Retrieval metrics, blind judging, calibration, diffs, and HTML reports |
-| `src/sci_rag/campaigns/` | Corpus campaigns: OpenAlex discovery, Crossref and Unpaywall rights, PRISMA screening |
-| `src/sci_rag/draft/` | Corpus-grounded drafters for the domain files |
-| `src/sci_rag/scaffold/` | The project factory that `sci-rag new` and `sci-rag init` drive |
-| `src/sci_rag/corpus.py`, `licensing.py`, `license_report.py`, `export.py`, `enrich.py`, `citations.py`, `snapshot.py` | Corpus lifecycle: delete, graph garbage collection, rights reports, export, metadata enrichment, citation edges, and snapshots |
-| `src/sci_rag/server/` | Shared service facade, FastAPI routes, auth, schemas, and MCP tools |
-| `src/sci_rag/cli/` | Typer command wiring, grouped by stage panel |
-| `tests/unit/` | Offline, database-free behavior and pure logic tests |
-| `tests/integration/` | PostgreSQL/pgvector pipeline and data-lifecycle tests |
-| `tests/server/` | REST and MCP contract tests over the shared service |
-| `tests/docs/` | Presentation checks measured in a browser against the built site |
-| `tests/cloud/` | Credentialed checks against live providers, skipped by default |
-| `data/demo/` | Synthetic CC0 fixture corpus, its manifest, and the committed graph replay |
-| `scripts/` | Development and documentation tooling: local and cloud Postgres, doc rendering, benchmark rendering, and graph replay |
-| `examples/` | A runnable notebook and script that the documentation links to |
-| `docs/` | User guides, methodology, operations, benchmarks, ADRs, and internal design records |
-| `infra/terraform/` | Optional Google Cloud deployment |
-
-Generated or local-only state belongs in the existing ignored locations such as `.env`, `.venv/`,
-`eval_results/`, `site/`, `backups/`, `.pgdata/`, `.cloudsql/`, `.context/`, `.worktrees/`,
-Terraform state, `data/raw/`, `data/interim/`, `data/processed/`, `data/demo/downloads/`, and
-`data/campaigns/`. Do not commit secrets, private corpora, downloaded papers, credentials, state
-files, campaign state, or local caches.
-
-## Work protocol
-
-1. Inspect `git status`, the relevant code, its tests, and recent history before editing. Preserve
-   unrelated user changes and do not reformat unrelated files.
-2. Identify the public contract and the architectural invariant affected by the task. For bugs,
-   reproduce the failure before changing code when practical.
-3. Implement the smallest complete change through an existing facade or extension seam. Avoid new
-   infrastructure, dependencies, or abstractions unless the existing design cannot express the
-   requirement.
-4. Add or update tests at the lowest layer that proves the behavior. Add integration or contract
-   coverage when the behavior crosses a database, REST, MCP, CLI, or migration boundary.
-5. Update user-facing documentation in the same change when behavior, configuration, output,
-   operations, or extension points change. Add an ADR for a new or reversed architectural decision.
-6. Run focused checks during iteration, then the appropriate full checks before handoff. Report
-   exactly what ran, what was skipped, and why.
-7. Review the final diff for accidental artifacts, secrets, unsupported claims, and changes outside
-   the requested scope. Commit, push, create pull requests, or deploy only when the task authorizes
-   those actions.
-
-Do not claim success from a passing unit test when the changed contract lives at a broader layer.
-Do not fix unrelated failures without explaining and scoping the additional work.
-
-## Environment and setup
-
-The supported Python versions are 3.11 and 3.12. Use `uv` for dependency and command execution.
-Do not replace `uv.lock` workflows with ad hoc `pip` environments.
-
-```bash
-make setup
+```
+GenericAgent 运行时（记忆面 L0-L4 + 记忆调用路由）      经验、偏好、路由知识
+        |  CLI / MCP 调用                        提纯 / 主动注入
+服务面（RagService 单门面: REST + MCP, scope 收口）
+        |
+知识库底座（Postgres 16-18 + pgvector: ingest/graph/relate/retrieve/answer）
+        |
+文件感知层（增量 reconcile: scheduler 定时 + hooks 事件 + OS 轮询兜底）
+        |
+C:\Users\<user>\ 下的异构文件
 ```
 
-`make setup` synchronizes the default ModelScope and DeepSeek dependencies with
-`uv sync --extra modelscope-embedding --extra openai`, starts the database backend selected by
-`SCI_RAG_DB_BACKEND`, and applies migrations. The equivalent steps spelled out:
+需求六项与研究难点到验收判据（A1-A7）的映射见规格 §0；本项目**以该规格为唯一设计基线**。
+
+## 2. 仓库地图
+
+| 路径 | 内容 | 来源 |
+| :--- | :--- | :--- |
+| `src/sci_rag/` | 知识库底座（ingest/graph/retrieve/answer/server/db/campaigns 等） | sci-rag-kit fork |
+| `tests/` | unit / integration / server / docs / cloud 分层测试 | fork |
+| `domain/` | 出厂 demo 域（农业语料），**测试基线，勿动** | fork |
+| `domain-personal/` | **个人文件空间域**：12 实体 / 11 关系 / 中文提示词，`SCI_RAG_DOMAIN_DIR=domain-personal` 切换 | 本项目特化 |
+| `plugins/` | `hooks.py`、`project_mode.py`（GenericAgent 原件）+ `pcmem_router.py`（记忆路由骨架） | GA + 本项目 |
+| `memory/` | GA 记忆面种子：L0 META-SOP、L1 索引、L2 事实、L3 `pcmem_sop.md` | GA + 本项目 |
+| `docs/superpowers/specs/` | **设计规格 v1.1 + 审阅记录**（受治理基线，见 §5） | 本项目 |
+| `migrations/` + `alembic.ini` | Alembic 迁移 | fork |
+| `MIGRATION.md` | 迁移台账：出处、排除清单、偏差记录 | 本项目 |
+| `AGENTS.md` | 代码级工作契约（上游运营合同 + fork 注记） | fork + 注记 |
+
+**外部依赖**：GenericAgent 运行时（外部实例，不 vendored；种子代码不可修改）；
+PostgreSQL 16-18 + pgvector。
+
+## 3. 环境与快速上手
 
 ```bash
+# 依赖（Python 3.11 或 3.12；禁 3.14）
 uv sync --extra modelscope-embedding --extra openai
-make db-up
-uv run sci-rag db upgrade
-```
 
-Docker is the template default and matches CI. `SCI_RAG_DB_BACKEND=local` runs the bundled
-conda-forge server through `scripts/local_postgres.py` on loopback with trust authentication, and
-also accepts a supported system PostgreSQL such as Postgres.app. `SCI_RAG_DB_BACKEND=cloud` uses the
-optional Cloud SQL development helper in `scripts/cloud_postgres.py` (ADR 0009). None of the three
-is a deployment path; [docs/run-postgres.md](docs/run-postgres.md) covers each.
+# 切换个人域
+export SCI_RAG_DOMAIN_DIR=domain-personal     # Windows: set SCI_RAG_DOMAIN_DIR=domain-personal
 
-Copy `.env.example` to `.env` only when local runtime configuration is needed. The file is about to
-hold a credential, and on POSIX `cp` alone leaves it readable by every account on the machine. On
-Windows, reset the copied ACL before removing inheritance so no unrelated explicit access rule
-survives.
-
-```bash
-cp .env.example .env
-chmod 600 .env
-```
-
-```powershell
-Copy-Item -Force .env.example .env
-icacls .env /reset
-icacls .env /inheritance:r /grant:r "$($env:USERNAME):(F)"
-```
-
-Never print credential values or include them in logs, fixtures, snapshots, or commits.
-
-### Provider defaults
-
-A new checkout defaults to ModelScope Qwen3 embeddings (`Qwen/Qwen3-Embedding-0.6B` at 1024
-dimensions) and DeepSeek generation, which reads `SCI_RAG_DEEPSEEK_API_KEY` and defaults its base
-URL to `https://api.deepseek.com` (ADR 0012). Google, Anthropic, and any OpenAI-compatible endpoint
-remain available. Setting a Google key alone does not switch the provider; `SCI_RAG_LLM_PROVIDER=google`
-does. `uv run sci-rag doctor` prints the current provider and model. Prefer
-`SCI_RAG_EMBEDDING_PROVIDER=local-hash` for offline development, which needs no credential and no
-model download.
-
-Model credentials are required for graph extraction, HyDE, community summaries, and generated
-answers. Vector and keyword retrieval work without them. Credentialed commands such as
-`make demo-cloud`, `make benchmark`, `make providers-check`, `sci-rag eval answers`, and
-`sci-rag campaign screen` are not routine validation. Run them only when the task requires them and
-the environment is explicitly configured for external model calls.
-
-Tests pin the environment before importing the package: the deterministic local-hash embedder, a
-64-dimensional test vector, blank Google credentials, and the paired `deepseek` provider and
-`DEFAULT_LLM_MODEL` defaults (`tests/conftest.py`). Keep that import-order guarantee intact, because
-the embedding dimension is bound into the models when the database models load.
-
-### Database safety
-
-Integration and server tests are destructive to the database named by
-`SCI_RAG_TEST_DATABASE_URL`: the session fixture drops and recreates application tables, and
-per-test fixtures truncate them. Use only a disposable test database. Never point this variable at
-a development corpus, shared database, staging instance, or production instance.
-
-The CI test database is PostgreSQL 16 with pgvector, served by `pgvector/pgvector:pg16` on port
-5433, and is named `sci_rag_test`. Local integration tests skip, with a diagnostic message, when
-their database is unavailable. A skipped integration suite is not evidence that database behavior
-passed. Create a disposable test database for Docker, local, or Cloud SQL and put only its URL in
-`SCI_RAG_TEST_DATABASE_URL` before claiming the database-backed suites passed.
-
-Supported servers are PostgreSQL 16 through 18, per
-[docs/adr/0008-supported-postgresql-versions.md](docs/adr/0008-supported-postgresql-versions.md).
-The `ci.yml` service proves 16; `docker-free-postgres.yml` proves whatever conda-forge resolves
-inside the range, which is 18 today, on linux-64 and osx-arm64. Do not add version-specific SQL
-without checking both ends. `scripts/local_postgres.py` runs a server from conda-forge for the pixi
-and conda paths; it is a development database on loopback with trust authentication and is never a
-deployment path.
-
-## Commands and validation
-
-Run commands from the repository root unless a command explicitly changes directories.
-
-### Fast feedback
-
-```bash
-# One test module
-uv run pytest tests/unit/test_chunker.py -q
-
-# One test or related group
-uv run pytest tests/unit/test_chunker.py -q -k "table"
-
-# Unit tests only
-uv run pytest tests/unit -q
-
-# Lint, format check, or type check
-make lint
-make typecheck
-```
-
-Use a test path and `-k` expression relevant to the change. Do not default to disabling warnings,
-capturing less output, or updating snapshots merely to make a failure disappear.
-
-### Baseline repository check
-
-```bash
-make check
-```
-
-`make check` runs `lint`, `typecheck`, and `test` in sequence: Ruff lint and format checks over
-`src`, `tests`, `examples`, and `scripts`; mypy over `sci_rag`; and pytest. Start the disposable
-PostgreSQL service first when integration coverage matters. `make test` runs pytest without a
-coverage floor; CI adds `--cov-fail-under=78`.
-
-### Exact Python CI parity
-
-CI additionally verifies the lockfile, runs every configured pre-commit hook, enforces coverage, and
-runs the Python checks on both Python 3.11 and 3.12:
-
-```bash
-uv lock --check
+# 测试（本机无 make，用等价裸命令）
 uv run ruff check src tests examples scripts
 uv run ruff format --check src tests examples scripts
 uv run mypy
-uv run pytest -q --cov=sci_rag --cov-report=term --cov-fail-under=78
-uvx pre-commit run --all-files --show-diff-on-failure
+uv run pytest tests/unit -q
 ```
 
-The `checks` job runs those against the pgvector service, after
-`uv sync --extra anthropic --extra openai`, because the provider extras carry the LLM adapters' tests
-and CI installs them rather than skipping that coverage. The `docker` job builds the image, runs
-`sci-rag --help` inside it, and asks Docker itself what the build context admitted: `pyproject.toml`,
-`uv.lock`, `alembic.ini`, `src`, `domain`, and `migrations` must be present, while `.env`,
-`.cloudsql/`, `.context/`, `data/raw/`, and bytecode must not be. The `terraform` job runs
-`fmt -check -diff -recursive`, `validate`, and the `dev-database` module's refusal checks. Agents
-normally need one supported local Python version; GitHub Actions supplies the version matrix. Do not
-lower the coverage floor to land a change.
+- **数据库**：docker 容器 `sci-rag-kit-db-1`（pgvector，端口 5433），或 `SCI_RAG_DB_BACKEND=local`。
+  集成/server 测试会破坏 `SCI_RAG_TEST_DATABASE_URL` 指向的库：**只准指向一次性测试库**，
+  绝不准指向开发/生产库。
+- **凭据**：`.env` 本机自建（参考 `.env.example`），不入库、不打印、不进日志。无生成凭据时
+  图抽取/社区摘要/答案生成整体降级，向量与关键字检索仍可用。
+- **生成文档三件套**（`docs/cli.md`、`docs/configuration.md`、`docs/benchmarks.md`）由脚本生成，
+  禁止手改；Windows 上重渲染 `docs/cli.md` 有反斜杠陷阱（`data\campaigns` 渲染差异），必须按
+  「渲染到 scratch、归一化、diff 核对」流程（该陷阱的原始说明保留在源仓库的上游 AGENTS.md）。
 
-### Documentation site checks
+## 4. 协作规范（多人）
 
-```bash
-make docs            # regenerate the checked reference pages, then build the site strictly
-make docs-reference  # regenerate docs/cli.md and docs/configuration.md without checking
-make docs-geometry   # measure the built site in a browser; needs `make docs` first
-make docs-serve      # live preview
-make cast            # regenerate the homepage sci-rag-new session and its terminal cast
+### 4.1 分支、提交与 PR
+
+- 分支命名 `<type>/<topic>`（`feat/`、`fix/`、`docs/`、`spec/`、`test/`）；Conventional Commits；
+  一 PR 一主题，不夹带无关重构。
+- PR 描述固定四段：**改动 / 验证（跑了什么、退出码）/ 残余风险 / 跳过项（为什么跳）**。
+- 涉及规格语义的 PR 还须满足 §5 的二次审阅要求。
+
+### 4.2 测试门槛
+
+- 放行口径：聚焦测试 + 全量 `tests/unit` **不新增失败**（当前基线见 §7）；跳过的检查必须显式声明，
+  跳过的集成测试不构成通过证据。
+- 检索/评测/融合权重相关改动：同语料前后消融证据（`sci-rag eval diff`）。
+- schema 改动：Alembic 迁移 + 一次性库上 `upgrade head` / `downgrade -1` 双向证据。
+- bug 修复：先写能复现原失败的回归测试，再修。
+
+### 4.3 文档与 ADR
+
+- 用户可见行为、配置、运维变化在**同一 PR** 更新文档。
+- 架构决策写 ADR（`docs/adr/`，0014 起），四节形状：context、decision、consequences、
+  reversal conditions。历史 ADR 与设计记录**只 supersede 不改写**。
+- 中英文排版：仓库源码与 docs 用英文（风格测试强制美式拼写，**全仓任何 UTF-8 文件禁 U+2014
+  破折号**，`memory/` 下中文文件同样适用）。
+
+### 4.4 证据纪律
+
+- 结论标注 `文件:行号`；没查证的写「未核验」；数字给可复算口径；禁止编造 ID、数值、结果。
+- 「未搜到」不等于「不存在」；「测试跳过」不等于「通过」。
+
+### 4.5 并发约定
+
+- **版本链 / 迁移 / reconcile 相关改动单人串行**（对应规格「单一写入方」精神）；认领见 §6。
+- 集成测试各用各的一次性数据库；长任务用 `.worktrees/` worktree 隔离。
+- 认领任务时在 §6.2 对应条目后标注 `@名字 (日期)`，避免两人撞同一改动面。
+
+### 4.6 隐私红线
+
+- `.env`、密钥文件仅引用不读取不打印；个人文件默认 `license_class='unknown'`（fail-closed），
+  出站（外部 LLM、导出）默认全拒；人名/机构/项目/地点不进日志与轨迹。
+
+## 5. 规格治理：二次审阅（强制条款）
+
+**受治理基线**：
+
+- `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md`（spec v1.1，独立审查「修订后放行」）
+- `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec审查.md`（审查报告与修订记录）
+- 审定原件存档于仓库外 `C:/Users/12062/OneDrive/Desktop/items/`；仓库内为工作基线副本
+  （安装时 8 处 U+2014 纯标点归一，偏差见 MIGRATION.md）。
+
+### 5.1 什么必须二次审阅
+
+凡属以下任一情形的改进或变化，**必须经过二次审阅后才可合并**：
+
+1. 修改或实现与规格相关的任何语义面：共享概念 C-1 至 C-13、存储契约（§3）、
+   scope 与隐私（§5）、功能面行为（§4.1 至 §4.7）、验收判据 A1 至 A7（附录 A）。
+2. 实现与规格出现**任何偏差**（包括认为规格本身有错而绕行的改动）。
+3. 对规格文本本身的修订（含新增/删除章节、判据变更）。
+
+**豁免**（PR 中声明即可）：纯排版与错字修复；不触及上述语义的测试修绿；上游 fork 同步。
+
+### 5.2 流程（四步，缺一不可）
+
+1. **指认**：PR/变更说明里指名受影响的 C/A 编号与规格章节（例：「spec §4.6 / A6-2 / C-4」）。
+2. **实现 + 验证**：按 §4.2 门槛；规格 §7 的预注册对抗性测试是放行门槛（先补测试再改实现）。
+3. **二次审阅**：由**非作者的独立审阅人**按 P0（阻断）/ P1（应改）/ P2（可选）分级审阅，
+   重点对拍：规格条款是否被遵守、验收判据是否仍可机械断言、是否重蹈历史缺陷
+   （旧评审 R-1 至 R-6 模式）。
+4. **归档**：审阅记录存 `docs/superpowers/specs/reviews/YYYY-MM-DD-<topic>-review.md`，
+   与代码同 PR 提交。
+
+审阅记录模板：
+
+```markdown
+# 审阅记录：<主题>
+- 日期 / 审阅人（非作者）/ 变更 PR 或提交
+- 对拍范围：spec §X / C-x / A-x
+- 判定：可放行 | 修订后放行 | 不通过（P0=n, P1=n, P2=n）
+- 逐条发现与改法 / 已确认正确 / 未验证声明
 ```
 
-`make docs` is more than a build. It regenerates `docs/cli.md`, `docs/configuration.md`, and the
-homepage cast with `--check`, so a stale generated page fails the run. It then builds with
-`mkdocs build --strict`, asserts that `site/planning` and the internal branding README never reach
-the published site, and greps the built site for internal planning language. Hand edits to a
-generated page are reverted by the next `make docs`; change the source instead, which is the Typer
-`help=` strings, the Pydantic field descriptions, or the report JSONs.
-
-The `docs` CI job runs `make docs`, installs Chromium, then runs
-`uv run pytest tests/docs tests/unit/test_docs_page_head.py -q` against the built `site/`. Geometry
-is what the Markdown-level guard in `tests/unit` cannot see, and the page-head module renders the
-site with MkDocs, so it runs only in this job. `make docs-geometry` installs a browser, which is why
-it is separate from `make docs` and from `make check`. The tests skip with instructions when the
-browser or `site/` is missing, which means a skipped run is not evidence that presentation passed.
-Changes under `docs/stylesheets/` need this guard, because a stylesheet defect is a number on a
-painted page rather than anything the Markdown-level tests can see.
-
-CI checks internal Markdown links in offline mode with lychee (`--offline`, so external-site flake
-can never break the build), and a separate `link-rot.yml` workflow tracks external links. Keep
-repository links relative and verify renamed or added documentation targets. A redirect to a missing
-page fails `make docs`, because `scripts/docs_redirects.py` applies the retired-page map after the
-build.
-
-### Conditional checks
-
-Run the checks that match the affected surface:
-
-```bash
-# Container or packaging changes
-docker build -t sci-rag-kit:agent-check .
-docker run --rm sci-rag-kit:agent-check sci-rag --help
-
-# Terraform changes
-terraform -chdir=infra/terraform fmt -check -diff -recursive
-terraform -chdir=infra/terraform init -backend=false -input=false
-terraform -chdir=infra/terraform validate
-```
-
-For documentation-only changes, run the relevant pre-commit and link checks at minimum, run
-`make docs` when a page, the nav, a generated reference page, or a stylesheet moved, and run
-`make check` when feasible. Disclose any check you deliberately omitted.
-
-### Benchmark and provider targets
-
-```bash
-make benchmark                # the reproducible benchmark behind docs/benchmarks.md
-make benchmark-check          # reproduce the published numbers, failing on a move beyond tolerance
-make benchmark-refresh-graph  # record a new immutable graph replay candidate
-make providers-check          # ask the documented partner models whether they still answer
-make eval-ablation
-make demo
-make demo-cloud
-```
-
-`make benchmark` needs the selected PostgreSQL backend and generation credentials. It ingests the
-tracked demo into otherwise pristine graph state, refuses to run when the replay preflight cannot be
-satisfied, and writes `docs/benchmarks.md` from the report JSONs. Select a named, disposable database
-for the run; do not clear an unrelated development corpus to satisfy the preflight. A number that
-moved is a finding to explain, not a refresh to commit.
-
-`make providers-check` is deliberately a local target and not a CI job: it calls a model, and a check
-that always skips is a check nobody reads.
-
-## Architecture invariants
-
-### Keep domain semantics out of Python
-
-Domain semantics belong in `domain/domain.yaml`, `domain/prompts/`, `domain/eval_seed_questions.jsonl`,
-and the evaluation JSONL files. A user configuring the kit for their field should not need to edit
-package code. General reusable capability belongs in `src/sci_rag/`; corpus-specific ontology, prompt
-wording, and ground truth do not.
-
-Prompt templates use `string.Template` with `$UPPER_CASE` slots. Preserve required slots, validate
-rendering, and keep JSON examples free from unnecessary escaping. Changes to judge prompts must
-preserve the separation between grounding and correctness.
-
-### Draft the domain files, do not hand-write them
-
-A user configuring this kit for a field has four files to produce: `domain/domain.yaml`,
-`data/corpus.jsonl`, `domain/eval_seed_questions.jsonl`, and light edits to
-`domain/prompts/*.md`. If you are working inside a generated project and about to author any of them
-from scratch, stop and run the drafter instead. It is grounded in the documents already on disk, and
-its output is validated through the same pydantic models the loaders use, which hand-written YAML is
-not.
-
-```bash
-uv run sci-rag draft manifest --folder data/raw
-uv run sci-rag draft ontology --from-corpus     # or --refine
-uv run sci-rag draft questions --count 10
-uv run sci-rag draft prompts entity_extraction
-uv run sci-rag draft seed-from-answers          # derive a seed set from answered runs
-```
-
-Every drafter also accepts `--print-prompt`, which renders the corpus-grounded prompt on stdout, and
-`--from-file`, which reads a reply back through identical validation. Use that pair when no model
-credentials are configured: render the prompt, answer it yourself, and feed the answer back rather
-than writing the file directly. It is the same validation either way. Printed prompts can contain
-sampled passages from the corpus, so confirm the documents' rights, privacy requirements, provider
-terms, and institutional policy before sending one to an assistant.
-
-Three rules the drafters enforce, which apply to you as well:
-
-- `license_class` is never inferred. Every drafted manifest row is `unknown`, and a rights decision
-  is the user's, not yours and not a model's.
-- Drafted seed questions carry a `drafted` tag. Evaluation reports repeat it until a domain expert
-  removes it. Do not remove the tag on a user's behalf, and do not quote a metric from a report that
-  still carries the warning.
-- `domain/eval_calibration_labels.jsonl` is hand-labeled by design. Generating it would make the
-  judge calibrate against itself.
-
-`sci-rag doctor` reports domain coherence: configuration, database, corpus, credentials, ontology
-size and naming, seed-question grounding against the ingested corpus, how many questions are still
-unreviewed, and manifest paths and rights. Run it after changing anything in `domain/`.
-
-`sci-rag build` is the documented path from documents to a queryable corpus: ingest, then graph
-extraction and communities when a credential exists. Keep it thin; it composes the same helpers
-`ingest`, `graph extract`, and `graph communities` use, and a new pipeline step belongs in those
-commands first.
-
-### Keep the command surface scannable
-
-Every top-level command and command group names one of the `rich_help_panel` values defined in
-`src/sci_rag/cli/main.py`: start here, build your knowledge base, ask questions, measure quality,
-serve, maintain. The groups are `db`, `graph`, `campaign`, `manifest`, `draft`, `eval`, `embed`, and
-`corpus`; the standalone commands are `new`, `init`, `doctor`, `build`, `ingest`, `retrieve`,
-`answer`, `stats`, `profile`, `serve`, and `mcp`. A one-line help string is read before any
-documentation: one action, present tense, and no term the glossary would have to define. Longer help
-belongs in the docstring body, where there is room to explain.
-
-### Depend on facades and shared seams
-
-Application code should use public facades such as `Retriever.retrieve()`, `AnswerEngine`, and
-`RagService` rather than reaching into retrieval-stage SQL or transport internals. REST routes and
-MCP tools must call the same `RagService` behavior so authentication, scope, citations, errors, and
-results cannot drift between surfaces. If a service contract changes, test both front doors where
-applicable.
-
-New providers should implement the existing `EmbeddingProvider` or `LLMClient` interfaces. New
-parsers should produce the shared block model. New retrieval mechanisms belong behind the
-retrieval facade and require trace output plus an ablation path.
-
-Keep the scaffold import-light. `sci_rag.scaffold` must not import `sci_rag.db`, `sci_rag.server`,
-or `sci_rag.llm` at module scope, because the wizard runs before any of them exist.
-
-### Preserve async concurrency boundaries
-
-Database and retrieval paths are asyncio end to end. Concurrent retrieval stages require separate
-SQLAlchemy async sessions because asyncpg cannot multiplex one session. Shared query embeddings may
-be awaited by multiple stages, but cancellation or timeout in one stage must not invalidate another
-stage's work. Avoid blocking I/O inside async request paths.
-
-### Enforce scope before ranking
-
-Retrieval access scope is a correctness and rights boundary, not a presentation filter.
-
-- Apply license, source, metadata, and exclusion conditions inside every stage's SQL before ordering
-  and limiting.
-- An explicitly empty license allowlist must return no results before embeddings or database work.
-- Treat `unknown` redistribution rights as unsafe. Never broaden default external access.
-  `sci_rag.licensing.EXTERNAL_SAFE_CLASSES` names what a service you do not fully control may expose.
-- Community summaries combine evidence before request scope is known, so scoped requests must not
-  use them.
-- Graph traversal, HyDE, reranking, resolution, and new retrieval stages must not reintroduce
-  excluded documents indirectly.
-- An export is a redistribution, so the same rules apply to `sci-rag corpus export`: it leaves out
-  `unknown` unless the caller names it, exports an entity only when every document it was extracted
-  from is in scope, and never exports communities, which aggregate with no per-document attribution
-  to check.
-
-Every scope change needs adversarial tests that prove excluded material cannot affect candidates or
-answers, including bounded candidate pools and alternate retrieval layers.
-
-### Degrade visibly and fail closed
-
-A slow or failed retrieval layer may contribute no candidates while the request continues, but its
-trace must say `timeout`, `error`, `empty`, `skipped`, `disabled`, or `denied` as appropriate. Do not
-catch an exception and silently pretend the stage succeeded. Traces must remain content-free: include
-stage, status, duration, and counts, but never query text, chunk text, API keys, or private document
-data.
-
-For authentication, authorization, licensing, and destructive corpus operations, fail closed. Open
-server mode is intended for local development only and must continue to warn loudly. `X-API-Key` wins
-over an infrastructure bearer token, which is what lets a caller narrow an over-broad platform
-identity; preserve that precedence. Preserve stable REST error codes and RFC 9457
-`application/problem+json` responses, and preserve `X-Request-ID` behavior across success and error
-paths.
-
-### Keep model output untrusted
-
-Validate LLM JSON shapes, ontology types, relationship endpoints, judge scores, citations, and other
-structured output before persistence or use. Malformed model output should be rejected or recorded
-as a visible failure according to the existing contract, never guessed into validity. Request-level
-LLM keys must remain ephemeral and must never be stored or logged. An empty completion is a failure,
-not an answer.
-
-### Preserve scientific honesty and provenance
-
-- Generated claims must be grounded in retrieved sources and carry stable numbered citations.
-- When the allowed corpus has no answer, say so instead of filling gaps from model priors.
-- HyDE output is a retrieval probe only. It is never evidence and must never be shown or cited as a
-  source.
-- Retrieval reports need their corpus fingerprint and git commit. `sci-rag corpus snapshot` records
-  the counts, per-document content hashes, embedding versions, git commit, and a single corpus
-  digest; reference it from a run with `--snapshot NAME` so a number stays tied to the corpus that
-  produced it.
-- The published demo benchmark replays one reviewed extraction draw, committed under
-  `data/demo/graph-replay/` with a receipt in `eval_results/`, per ADR 0011. Do not sample a fresh
-  graph to reproduce a published number, and do not hand-edit a generated benchmark table without
-  updating the reproducible report inputs.
-- Grounding evaluation sees the question, generated answer, and retrieved sources, but not the
-  reference answer. Correctness evaluation is a separate reference-based pass. The report stamps both
-  the answer model and the judge model, because grading with the model that wrote the answers is a
-  known bias.
-- A compressed-answer condition is evidence only as a pair. The compression gate needs the
-  uncompressed and compressed runs together, and the roles come from each report's own
-  `config.compression`, not from a directory timestamp.
-- Malformed judge responses are failures, not zero-cost coercions. Human calibration data must be
-  described honestly, including whether labels are expert or non-expert.
-- Keep at least one `unanswerable` honesty probe in real evaluation sets.
-
-For changes to chunking, retrieval, routing, graph extraction, reranking, prompts, fusion weights,
-or evaluation behavior, run a before/after retrieval ablation on the same corpus and include both
-results in the pull request. Use `uv run sci-rag eval diff` when comparing saved runs. Do not claim
-improvement from unmatched corpora, different snapshots, or one favorable aggregate metric.
-
-### Keep schema and embedding changes deliberate
-
-PostgreSQL is the operational store for documents, chunks, vectors, full-text indexes, entities,
-relationships, and communities. Do not introduce a second vector or graph database without an ADR
-that revisits the accepted design.
-
-Keep SQLAlchemy models and Alembic migrations consistent. A persisted schema change needs a new
-migration and migration-path validation, not only `Base.metadata.create_all()` coverage. Back up
-real data before migrations or bulk corpus operations, and verify restores with `sci-rag doctor`
-and corpus digests as described in [docs/operations.md](docs/operations.md).
-
-The embedding dimension is a schema property and defaults to 1024, and it must stay within 32
-through 1024. Settings rejects a ModelScope dimension outside that range, and migration `0007`
-requires the configured dimension to be in range for every provider and fails fast otherwise. An
-existing 1536-dimensional database must have `SCI_RAG_EMBEDDING_DIM` changed to 1024 in `.env`
-before `uv run sci-rag db upgrade`, followed by `uv run sci-rag embed reindex --dry-run` and then
-`--apply`. Changing the provider, model, version stamp, or dimension requires an explicit
-re-embedding plan; a dimension change also requires a migration plus a full re-ingest, never a
-reindex. Never permit mixed or silently truncated vector dimensions.
-
-### Keep corpus mutation and campaign rights deliberate
-
-Corpus lifecycle commands are destructive or rights-bearing, so treat them as such.
-
-- `sci-rag corpus delete` cascades a document's chunks, citation pointers, graph evidence, and the
-  communities built from it. After a delete, rebuild coverage with `graph communities` and sweep
-  with `graph gc --apply`.
-- `sci-rag graph resolve-entities` merges conservatively and audits every merge, and it invalidates
-  stored community summaries. Keep the dry-run default and rebuild after an applied run.
-- `sci-rag corpus enrich` and `graph citations` write cached Crossref metadata and citation edges.
-  Both preview by default; keep that default.
-- Campaigns never infer rights. A drafted manifest row is always `unknown`, and the rights decision
-  belongs to the user. Discovery, enrichment, and download go through `PoliteHttpClient` with the
-  campaign `mailto` (`SCI_RAG_CAMPAIGN_MAILTO`); Unpaywall resolves open-access locations, and a PDF
-  over `--max-pdf-mb` is rejected.
-- Screening decisions carry a confidence threshold. A row below it is queued for human review rather
-  than resolved by the model. Do not remove the review queue or accept a low-confidence decision
-  automatically.
-- Campaign state lives in `data/campaigns/<slug>/state.jsonl` and is resumable. Do not commit
-  campaign state, downloaded PDFs, or a manifest for a private corpus.
-
-## Implementation conventions
-
-- Target Python 3.11 syntax and keep public/package code fully typed. Mypy disallows untyped
-  function definitions in `sci_rag`.
-- Ruff is authoritative for imports, lint, modernization, simplification, and formatting. The line
-  length is 100; let the formatter decide layout.
-- Follow existing dependency-injection patterns. Accept optional settings, providers, clients, or
-  session factories where tests need deterministic substitutes.
-- Write docstrings that explain why a module or non-obvious seam has its shape. Write for a
-  scientist encountering the code for the first time.
-- Use plain language, avoid unexplained jargon, and do not use em dashes anywhere in repository
-  source. `tests/unit/test_docs_style.py` enforces the em dash rule across every UTF-8 source file,
-  along with American spelling and the retired verb.
-- Keep logs structured with `structlog`. Log operational metadata, not secrets or content.
-- Non-streaming answers and streaming SSE responses must aggregate the same typed event stream.
-- Avoid speculative framework layers. The project deliberately has no task queue, cache service,
-  graph sidecar, or plugin framework.
-
-New dependencies require a clear benefit, compatibility with Python 3.11 and 3.12, and an updated
-`uv.lock`. Keep heavyweight functionality optional when possible, following the Docling, ModelScope
-embedding, tokenizers, reranker, Anthropic, OpenAI, and Parquet export extras.
-
-## Test design
-
-Tests should be deterministic, offline by default, and behavior-focused.
-
-- Put pure transforms, validation, routing, fusion, scope construction, report generation, and
-  drafter validation in unit tests.
-- Use integration tests for SQL semantics, migrations, pgvector behavior, transactions, graph
-  cleanup, ingestion, campaigns, and end-to-end retrieval.
-- Use server tests for auth scopes, rate limits, error envelopes, request IDs, SSE, REST schemas, and
-  MCP parity.
-- Use `tests/docs` for presentation geometry, which needs a built `site/` and a browser.
-- Use `LocalHashEmbedder` and mock `LLMClient` implementations unless a test is explicitly marked
-  and documented as credentialed. Live provider checks belong in `tests/cloud` under the `cloud`
-  marker.
-- Reproduce rights and scope bugs with both an eligible and an ineligible document. Assert absence,
-  not just the presence of a desired result.
-- Assert trace status and degradation metadata when exercising timeouts, skipped layers, malformed
-  model output, or fallbacks.
-- For a bug fix, add a regression test that fails for the original reason before applying the fix.
-
-Do not weaken assertions, widen timing tolerances without evidence, or replace realistic boundary
-tests with mocks solely to get green results. If an integration test skips because PostgreSQL is
-unavailable, state that limitation explicitly.
-
-## Documentation, API, and release discipline
-
-Update documentation whenever a user can observe a change to a command, configuration variable,
-manifest field, API schema, MCP tool, prompt slot, report format, deployment step, or failure mode.
-Keep README, API reference, examples, and implementation terminology consistent.
-
-Documentation changes follow [docs/STYLE.md](docs/STYLE.md): every page gets exactly one Diataxis
-type (tutorial, how-to, reference, or explanation), stated in that guide's page-type table. A new
-page in `mkdocs.yml` has to be classified there or the build fails, which is the intended order:
-decide what the page is, then write it. `tests/unit/test_docs_style.py` enforces the checkable half
-and runs in `make check`.
-
-Three reference pages are generated from source and reverted by `make docs` when hand-edited:
-`docs/cli.md` from the Typer `help=` strings, `docs/configuration.md` from the Pydantic field
-descriptions, and `docs/benchmarks.md` from the evaluation report JSONs through
-`scripts/render_benchmarks.py`. Change the source, then run `make docs-reference` or
-`make benchmark`.
-
-`docs/planning/` and `docs/superpowers/` are design records excluded from the built site. They
-describe how the project reached its current shape, so supersede them rather than rewriting them.
-Retired pages keep answering at their old addresses through the redirect map in `mkdocs.yml`
-(`extra.redirects`), applied by the `scripts/docs_redirects.py` hook.
-
-Architectural changes require an ADR with context, decision, consequences, and reversal conditions.
-Do not edit historical ADRs to make a new decision appear old; supersede them explicitly. Record
-user-visible changes in [CHANGELOG.md](CHANGELOG.md) under `Unreleased`.
-
-The project is pre-1.0 but still follows the compatibility promises in
-[docs/VERSIONING.md](docs/VERSIONING.md). Treat public Python imports, CLI commands, REST schemas,
-MCP tool names, environment variables, domain-file shapes, and report formats as contracts. Note
-breaking changes clearly and provide a migration path.
-
-## Pull requests and completion criteria
-
-Follow [.github/pull_request_template.md](.github/pull_request_template.md). Use a concise,
-conventional title consistent with history, such as `feat(retrieve): ...`, `fix(server): ...`,
-`test(evals): ...`, or `docs: ...`. Keep commits focused and explain why the change is needed.
-
-A change is complete only when all applicable statements are true:
-
-- The final diff is narrow, readable, and free of secrets, private data, caches, and generated junk.
-- The requested behavior is covered at the correct test layer, including failure and rights-boundary
-  cases.
-- Focused tests pass, applicable full checks pass, and skipped checks are disclosed.
-- User-visible behavior and operational changes are documented.
-- Documentation changes leave `make docs` passing when a page, the nav, a generated reference page,
-  or a stylesheet moved.
-- Retrieval or evaluation changes include comparable before/after evidence.
-- Schema changes include migrations and migration-path evidence.
-- REST and MCP remain aligned behind `RagService` where the shared contract changed.
-- Scientific claims, metrics, citations, and benchmark statements are supported by reproducible
-  evidence.
-- The handoff or pull request summarizes the change, verification, residual risk, and any follow-up
-  work without overstating what was tested.
-
-When blocked by missing credentials, unavailable infrastructure, or a decision that would expand
-scope materially, stop at the safe boundary and ask for direction. Never fabricate test evidence,
-live-service results, credentials, citations, benchmark improvements, or deployment status.
+### 5.3 规格自身的修订规则
+
+- 版本号递增（v1.1 → v1.2 ...），修订内容追加到审查报告「修订记录」节，历史条目不改写。
+- 修订后的规格**同样必须过一次独立审阅**才能成为新基线（作者不得自批）。
+- 撤销条件（规格 §8）触发时：停下实现、回规格修订，而不是继续硬推。
+
+### 5.4 违反处理
+
+未附审阅记录的规格相关 PR **不得合并**；已合并的违规变更要么回滚、要么补审并在修订记录留痕。
+
+---
+
+## 6. 任务台账
+
+> 维护规则：认领标注 `@名字 (日期)`；完成后整条移入 §6.1 并补「验证证据」；
+> 阻塞项写明阻塞原因与解除条件。验收依据列指向规格附录 A 的判据编号。
+
+### 6.1 已完成（Done，截至 2026-10-14）
+
+| # | 任务 | 产出 | 验证证据 |
+| :--- | :--- | :--- | :--- |
+| D1 | 迁移 sci-rag-kit 整树 fork（510 文件，排除 `.env`/`data/raw`/`.venv`/`site` 等） | 本仓库 + `MIGRATION.md` | `uv sync` 通过；`test_docs_style` 15/15；`tests/unit` 1517 passed |
+| D2 | 迁移 GenericAgent 记忆面（hooks/project_mode/L0-L3 种子），零改 GA 种子代码 | `plugins/`、`memory/` | 三模块导入通过 |
+| D3 | 个人域特化：12 实体 / 11 关系 / 3 提示词 / query_classes | `domain-personal/` | `load_domain` + `render_prompt` 槽位渲染通过 |
+| D4 | 记忆路由骨架（五场景触发表挂 hook 总线） | `plugins/pcmem_router.py` | hooks 注册可导入 |
+| D5 | PC-Mem 设计规格 v1.1 撰写 | `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` | 独立审查「修订后放行」 |
+| D6 | 独立审查（P0=1/P1=7/P2=8）并修订 | `...-spec审查.md` + spec v1.1（附录 A 56 条判据） | P0/P1 全修、P2 修 5 留 3（在案） |
+| D7 | 测试基线归因：5 条 git 态测试转绿、`test_cli_help` 定位上游既有、`backups/.gitkeep` 修复 | 提交 `ec1c5d2` | 源仓库基线对照复跑 |
+| D8 | spec 装入项目 + 标点归一（8 处 U+2014） | `docs/superpowers/specs/` 两份 | `test_docs_style` 通过 |
+| D9 | 协作指南 + 任务台账 + 二次审阅治理制度 | 本文件（原 `AGENT.md`） | 二次审阅条款自该提交生效 |
+| D10 | 文档入口统一：移除上游 `AGENTS.md`，`AGENT.md` 改名为 `AGENTS.md` 并修正内部引用 | 本文件 + `MIGRATION.md` | `test_docs_style` / `test_cli_help` 无新增失败 |
+
+### 6.2 待办（TODO）
+
+**P0 清障**（阻塞 P1；来源：规格 §6）：
+
+- [ ] 合并 `feature/incremental-reconcile` 分支（reconcile/fingerprint + 21 文件；合并时按
+      规格 §4.6 落 `PendingIngest` 交接与版本链语义改造）⚠ **单人串行**，认领：____
+- [ ] ADR 编号冲突收口：分支 `0012-document-level-reconcile` 重命名 0013 并修正自指；
+      2026-10-08 reconcile 稿受影响节加修订说明（supersede 不改写）
+
+**P1 底座**（依赖 P0）：
+
+- [ ] M-0008-R 迁移：documents 新列、`projects`/`document_embeddings`/`file_events` 表、
+      CHECK 约束、部分唯一索引（`content_hash WHERE is_current`、`version_of`）+ ADR 0014
+      （版本链 / 哈希约束 / 基线谓词三决策）；downgrade 内链折叠。验收：A3-6、A6-2 + 迁移双向
+- [ ] C-1 复合身份贯通：reconcile 分桶键 `(path, source_member)`、宿主成员聚合哈希探针、
+      member_key 规则（Message-ID 优先）。验收：对抗测试 #9（A1-4）
+- [ ] `is_current` 基线谓词 + scope 字段总表（§5.2）+ 非 walk 路径统一收口。
+      **先补对抗测试 #1/#2 再改实现**。验收：A3-7、A4-6、A5-2
+- [ ] `test_retrieval_scope.py` 两条断言改写 + `dataclasses.fields` 元测试兜底
+
+**P2 写方并行**（依赖 P1，两线可并行）：
+
+- [ ] F1 解析面：`parse_file_many`、Office 三件套、邮件（一文件多文档）、OCR 协议、
+      占位文件 owner + 第 10 类状态 `placeholder_skipped`、失败统计持久化（汇总表 + 退出码）
+      验收：A1-1 至 A1-7
+- [ ] F2 抽取面：本体换代重建路径（graph gc/extract --all/resolve/communities）、
+      项目三来源（manual>rule>inferred + 锁定）、标签分列、同名合并审计收据、
+      ExtractionStats 丢弃计数、`project` 命令组（面板归属）。验收：A2-1 至 A2-8
+
+**P3 关系面**（依赖 P2）：
+
+- [ ] `relate/` 新包：相似（居中向量）、提及引用（对账键/消歧/CHECK）、版本链维护语义
+      （删除重连、批量提升、双 reason）、读取面全部带 scope。验收：A3-1 至 A3-9
+
+**P4 检索浏览**（spike 可提前，浏览依赖 P3）：
+
+- [ ] 中文 keyword spike（预注册：24 条样本、`hit@20>=0.75`、`p95<=300ms`、决策规则 B→D→E；
+      产物 `docs/spikes/zh-keyword-spike.md`；改造面 keyword.py/router.py/domain.py 三处）
+- [ ] 浏览面：`/v1/corpus/facets`（分面硬约束 + 空值桶）、`browse` 命令组、
+      MCP 扩展 4 工具（`browse_corpus`/`list_projects`/`get_related_documents`/`get_document_versions`）
+      验收：A4、A5
+
+**P5 记忆面**（依赖 P4）：
+
+- [ ] `pcmem_router` 注入实现（五场景触发表 + 调用记录断言，验收 A7-3）
+- [ ] 遗忘/热度：热温冷三层、`valid_from/valid_to`、stale 只标记不删除（A7-1/A7-2）
+- [ ] 三触发通道接线（scheduler/hooks/轮询）+ `pg_advisory_lock` 单实例（A6-8）；
+      `--reflect` 启动形态写入部署文档
+
+**P6 研究**（依赖 P5，验收走研究豁免条款）：
+
+- [ ] R8 工作历史叙事（timeline + 主题簇 + L4 归档 → 时序叙事，评分协议先行）
+- [ ] 多模态增强、消融研究（include_citations / 重排器默认值需消融证据才动）
+
+**杂项与运维**：
+
+- [ ] `.env` 本机手工建立（凭据不入 git，参考 `.env.example`）
+- [ ] `data/raw` 本机语料重建（331M 未随迁）
+- [ ] 集成/server 测试首跑（起一次性测试库后；此前属未验证项）
+- [ ] 迁移 up/down 双向验证（一次性库）
+- [ ] compression 成对闸门在个人语料重跑（0.0 floor 仅在 demo 语料验证过）
+- [ ] 轮询边际成本实测回填（规格 §4.6 标 `[待实测]`）
+- [ ] `test_cli_help` 转绿（依赖 P3/P4 落地 `relate`/`refresh`/`project` 命令；**不得为消红删文档引用**）
+- [ ] GenericAgent 侧部署：`--reflect`/scheduler 形态、`pcmem_router` 装入外部 GA 实例的安装说明
+
+## 7. 已知问题与测试基线（2026-10-14）
+
+- 基线：`uv run pytest tests/unit -q` → **1517 passed / 1 failed / 38 skipped**。
+- 唯一失败 `test_cli_help.py::test_every_documented_command_exists`：上游既有（源仓库同失败，
+  其新 spec 文档引用了未实现命令）；PC-Mem spec 引用的 `browse`/`relate` 等会追加 offender，
+  P3/P4 落地后自然转绿。
+- **未验证项**（勿当已验证）：集成/server 套件（需测试库）、Alembic 迁移双向、凭据路径
+  （图抽取/HyDE/答案生成）、`make docs` 构建、生成页三件套、Windows 占位文件属性位
+  （CI 不可验，仅本地验证不构成通过证据）。
+- Windows 主机陷阱：无 `make`（用 §3 裸命令）；`docs/cli.md` 禁直接重渲染覆盖（反斜杠）；
+  给原生工具传 `C:/...` 前向斜杠路径；bash `$TMPDIR` 可能指向原生 Python 解释不了的 `/tmp`。
+
+## 8. 文档索引
+
+| 文件 | 用途 |
+| :--- | :--- |
+| `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` | **设计基线 v1.1**（概念 C-1..C-13、存储契约、功能面、验收 A1-A7） |
+| `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec审查.md` | 独立审查报告 + 修订记录 |
+| `docs/superpowers/specs/reviews/` | 二次审阅记录归档处（§5.2） |
+| `AGENTS.md` | 本文件（项目协作 + 代码契约 + 台账，改代码前必读） |
+| `MIGRATION.md` | 迁移台账：来源、排除、偏差 |
+| `docs/adr/` | 架构决策记录（0014 起为本项目新决策） |
+| `memory/pcmem_sop.md` | Agent 侧知识库使用 SOP（L3） |

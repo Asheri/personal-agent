@@ -52,7 +52,7 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
   copies of the reviewed PC-Mem design artifacts. The reviewed originals stay outside
   the repository at `C:/Users/12062/OneDrive/Desktop/items/` as the audit baseline.
 - Governance: every spec-derived improvement or change requires a secondary review by
-  a non-author before merge (AGENT.md section 5). Spec revisions bump the version and
+  a non-author before merge (AGENTS.md section 5). Spec revisions bump the version and
   are themselves reviewed; history is superseded, never rewritten.
 
 ## Deviations from copied sources (recorded, semantics unchanged)
@@ -65,6 +65,10 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
 - The two installed PC-Mem spec copies above: 6 and 2 em-dash punctuations replaced
   with colons or a semicolon for the same house rule. Pure punctuation, semantics
   unchanged; the originals outside the repository are untouched.
+- Upstream `AGENTS.md` (sci-rag-kit operating contract) removed from the repository per
+  project decision; the original stays in the source repo at `items/sci-rag-kit/`. Its
+  still-binding test/style/docs discipline is folded into AGENTS.md sections 3 and 4.
+  `AGENT.md` renamed to `AGENTS.md` as the single entry file (ledger row D10).
 
 ## Not migrated (deliberate, pending phases)
 
