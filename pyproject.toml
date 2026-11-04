@@ -84,8 +84,8 @@ dev = [
 ]
 docs = [
   "mkdocs==1.6.*",
-  "mkdocs-material==9.7.*",
-  "pymdown-extensions>=10.16,<12",
+  "mkdocs-material>=9.7,<9.9",
+  "pymdown-extensions>=10.16,<13",
 ]
 # Kept out of `docs` so building the site stays a light install. Only the
 # rendered-geometry guard needs a browser, and it skips when this is absent.
