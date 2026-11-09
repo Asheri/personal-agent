@@ -103,6 +103,12 @@ That run used a controlled handler, not a live model conversation. See
 [Agent integration](agent-integration.md) for what it needs and why
 GenericAgent is not vendored.
 
+## Larger runs
+
+[The benchmark catalogue](benchmark-catalogue.md) lists the public benchmarks
+this project can run, what each one exercises, and the GPU-hours each costs, so
+a reader with an A100 can go past the sample size used here.
+
 ## Not measured
 
 No representative personal corpus, no live Agent conversation, no native OCR
