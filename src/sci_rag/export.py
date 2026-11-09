@@ -49,7 +49,8 @@ TABLES: tuple[str, ...] = ("documents", "chunks", "entities", "relationships")
 #: generated tsvector: a Postgres index artifact, not corpus data, and not
 #: portable to anything downstream.
 ALWAYS_SKIP: dict[str, frozenset[str]] = {
-    "chunks": frozenset({"search_tsv"}),
+    "chunks": frozenset({"search_tsv", "search_tokens", "search_zh_tsv"}),
+    "documents": frozenset({"identity_key", "version_of", "access_count", "last_accessed_at"}),
 }
 
 #: Skipped unless ``include_embeddings``. Vectors dominate the output size and
@@ -103,9 +104,9 @@ async def export_corpus(
 ) -> ExportResult:
     """Write one file per table under ``directory``.
 
-    ``scope`` of ``None`` exports everything. Any scope at all is applied
-    fail-closed, including to the graph; see the module docstring for why the
-    graph needs a different rule than the rows.
+    ``scope`` of ``None`` applies the default current-version baseline.
+    Explicit scopes also enforce rights and metadata restrictions, including
+    on aggregates; see the module docstring for the graph evidence rule.
     """
     if fmt not in FORMATS:
         raise ValueError(f"unknown export format {fmt!r}; known: {', '.join(FORMATS)}")
@@ -145,7 +146,8 @@ async def _collect(
     scope: RetrievalScope | None,
     include_embeddings: bool,
 ) -> dict[str, list[dict[str, Any]]]:
-    conditions = scope_conditions(scope) if scope is not None else []
+    scope = scope or RetrievalScope()
+    conditions = scope_conditions(scope)
 
     doc_query = select(Document).order_by(Document.id)
     if conditions:
@@ -154,10 +156,9 @@ async def _collect(
     document_ids = {document.id for document in documents}
 
     chunk_query = select(Chunk).order_by(Chunk.document_id, Chunk.chunk_index)
-    if scope is not None:
-        chunk_query = chunk_query.join(Document, Chunk.document_id == Document.id)
-        if conditions:
-            chunk_query = chunk_query.where(*conditions)
+    chunk_query = chunk_query.join(Document, Chunk.document_id == Document.id)
+    if conditions:
+        chunk_query = chunk_query.where(*conditions)
     chunks = list((await session.scalars(chunk_query)).all())
 
     entities = list((await session.scalars(select(KgEntity).order_by(KgEntity.id))).all())
@@ -165,7 +166,7 @@ async def _collect(
         (await session.scalars(select(KgRelationship).order_by(KgRelationship.id))).all()
     )
 
-    if scope is not None:
+    if not scope.include_superseded or not scope.is_unrestricted():
         entities = [e for e in entities if _entity_in_scope(e, document_ids)]
         surviving = {entity.id for entity in entities}
         relationships = [

@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # --- Database -----------------------------------------------------------
     database_url: str = "postgresql+asyncpg://sci_rag:sci_rag@localhost:5433/sci_rag"
 
+    # Optional offline OCR; no executable or language data is downloaded at runtime.
+    ocr_tesseract_cmd: str | None = None
+    ocr_tessdata_dir: Path | None = None
+    ocr_languages: str = "chi_sim+eng"
+
     # --- Google credentials (either an AI Studio key or a GCP project) ------
     google_api_key: str | None = None
     gcp_project: str | None = None

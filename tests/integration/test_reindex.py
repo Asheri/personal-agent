@@ -15,6 +15,7 @@ import subprocess
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from alembic import command
@@ -328,6 +329,10 @@ async def _restore_test_vector_schema() -> None:
             )
         )
         await conn.execute(text("DROP TABLE IF EXISTS alembic_version"))
+
+    # Restore every schema revision, not only the vector widths, after a downgrade test.
+    with patch.dict(os.environ, {"SCI_RAG_EMBEDDING_DIM": str(TEST_EMBEDDING_DIM)}):
+        await asyncio.to_thread(command.upgrade, _alembic_config(), "head")
 
 
 @asynccontextmanager

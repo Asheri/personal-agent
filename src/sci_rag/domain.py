@@ -22,17 +22,20 @@ from string import Template
 from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PositiveInt
 
 
 class EntityTypeSpec(BaseModel):
     name: str
     description: str = ""
+    canonical_suffixes: dict[str, PositiveInt] = Field(default_factory=dict)
 
 
 class RelationTypeSpec(BaseModel):
     name: str
     description: str = ""
+    source_types: list[str] = Field(default_factory=list)
+    target_types: list[str] = Field(default_factory=list)
 
 
 class QueryClassSpec(BaseModel):
@@ -189,10 +192,17 @@ class DomainProfile:
     def classify_query(self, query: str) -> QueryClassSpec | None:
         """Pick the query class whose keywords best match; None if nothing hits."""
         words = set(re.findall(r"[a-z0-9]+", query.lower()))
+        from sci_rag.keyword_tokens import contains_han
+
+        lowered = query.casefold()
         best: QueryClassSpec | None = None
         best_hits = 0
         for query_class in self.config.query_classes:
-            hits = sum(1 for kw in query_class.keywords if kw.lower() in words)
+            hits = sum(
+                1
+                for kw in query_class.keywords
+                if (kw.casefold() in lowered if contains_han(kw) else kw.lower() in words)
+            )
             if hits > best_hits:
                 best, best_hits = query_class, hits
         return best

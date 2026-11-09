@@ -29,6 +29,12 @@ from sci_rag.db.models import KgCommunity, KgEntity, KgRelationship
 from sci_rag.domain import DomainProfile
 from sci_rag.embed.provider import EmbeddingProvider
 from sci_rag.llm import LLMClient
+from sci_rag.retrieve.types import (
+    RetrievalScope,
+    entity_scope_condition,
+    relationship_scope_condition,
+)
+from sci_rag.versions import lock_document_writes
 
 log = structlog.get_logger(__name__)
 
@@ -94,23 +100,37 @@ async def build_communities(
 ) -> CommunityStats:
     stats = CommunityStats()
     async with session_factory() as session:
-        entities = (await session.execute(select(KgEntity))).scalars().all()
-        relationships = (await session.execute(select(KgRelationship))).scalars().all()
-
-    if not entities:
-        log.info("communities_no_entities")
-        return stats
-
-    by_id = {e.id: e for e in entities}
-    groups = detect_communities(
-        [e.id for e in entities],
-        [(r.source_entity_id, r.target_entity_id) for r in relationships],
-    )
-    keep = [members for members in groups.values() if len(members) >= min_size]
-    keep.sort(key=lambda members: (-len(members), members[0]))
-
-    async with session_factory() as session:
+        await lock_document_writes(session)
+        entities = (
+            (
+                await session.execute(
+                    select(KgEntity).where(entity_scope_condition(RetrievalScope()))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        relationships = (
+            (
+                await session.execute(
+                    select(KgRelationship).where(relationship_scope_condition(RetrievalScope()))
+                )
+            )
+            .scalars()
+            .all()
+        )
         await session.execute(delete(KgCommunity))
+        by_id = {e.id: e for e in entities}
+        groups = detect_communities(
+            [e.id for e in entities],
+            [
+                (r.source_entity_id, r.target_entity_id)
+                for r in relationships
+                if r.source_entity_id in by_id and r.target_entity_id in by_id
+            ],
+        )
+        keep = [members for members in groups.values() if len(members) >= min_size]
+        keep.sort(key=lambda members: (-len(members), members[0]))
         for members in keep:
             community = await _build_one(
                 members, by_id, relationships, llm, embedder, domain, stats

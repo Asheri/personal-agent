@@ -43,9 +43,11 @@ def get_session_factory() -> async_sessionmaker[AsyncSession]:
 
 
 @asynccontextmanager
-async def session_scope() -> AsyncIterator[AsyncSession]:
+async def session_scope(
+    *, factory: async_sessionmaker[AsyncSession] | None = None
+) -> AsyncIterator[AsyncSession]:
     """A session that commits on success and rolls back on any exception."""
-    async with get_session_factory()() as session:
+    async with (factory or get_session_factory())() as session:
         try:
             yield session
             await session.commit()

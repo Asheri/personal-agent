@@ -9,7 +9,7 @@ multi-RAG routers all connect here. Two transports, one tool set:
   sharing the exact service instance the REST API uses.
 
 Tool descriptions below are written for the agent reading them: what the
-tool is for, when to reach for it, and what comes back. The eight tools
+tool is for, when to reach for it, and what comes back. The tools
 follow an inspect-then-drill pattern (search or ask first; documents,
 entities, and relationships for follow-up).
 """
@@ -25,7 +25,24 @@ from sqlalchemy import case, func, or_, select, text
 
 import sci_rag
 from sci_rag.db.models import KgEntity, KgRelationship
+from sci_rag.licensing import EXTERNAL_SAFE_CLASSES
+from sci_rag.retrieve.types import (
+    RetrievalScope,
+    entity_scope_condition,
+    relationship_scope_condition,
+)
 from sci_rag.server.service import RagService
+
+
+def external_filters(filters: dict[str, Any] | None = None) -> dict[str, Any]:
+    values = RagService.validated_filters(filters)
+    requested = values.get("license_classes")
+    values["license_classes"] = [
+        value
+        for value in (EXTERNAL_SAFE_CLASSES if requested is None else requested)
+        if value in EXTERNAL_SAFE_CLASSES
+    ]
+    return values
 
 
 def build_mcp_server(
@@ -44,7 +61,9 @@ def build_mcp_server(
             f"{service.domain.name}. Start with answer_question for a cited answer, "
             "or search_corpus when you want raw evidence to reason over yourself. "
             "Use corpus_stats or list_sources first if you need to know whether this "
-            "knowledge base covers a topic at all."
+            "knowledge base covers a topic at all. Use get_related_documents for project "
+            "peers and explicit cross-file links, and get_document_versions for latest-version "
+            "questions. Inspect the returned source documents before drawing conclusions."
         ),
     )
 
@@ -56,6 +75,7 @@ def build_mcp_server(
         year_min: int | None = None,
         year_max: int | None = None,
         journals: list[str] | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Search the knowledge base and get back ranked evidence chunks.
 
@@ -72,8 +92,7 @@ def build_mcp_server(
         community summaries because a summary cannot be filtered after the
         fact.
         """
-        result = await service.retrieve(
-            query,
+        options: dict[str, Any] = dict(
             profile="deep" if deep else "interactive",
             top_k=max(1, min(top_k, 50)),
             license_classes=license_classes,
@@ -81,6 +100,13 @@ def build_mcp_server(
             year_max=year_max,
             journals=journals,
         )
+        extra = service.validated_filters(filters)
+        extra.pop("exclude_retracted", None)
+        options.update(extra)
+        options["license_classes"] = external_filters(
+            {"license_classes": options.get("license_classes")}
+        )["license_classes"]
+        result = await service.retrieve(query, **options)
         return {
             "query": query,
             "results": [
@@ -106,6 +132,7 @@ def build_mcp_server(
         top_k: int = 8,
         license_classes: list[str] | None = None,
         include_compression: bool | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Ask the knowledge base a question and get a grounded, cited answer.
 
@@ -121,12 +148,18 @@ def build_mcp_server(
         citations: list[dict[str, Any]] = []
         error: dict[str, Any] | None = None
         compression: dict[str, Any] | None = None
-        async for event in service.answer_stream(
-            query,
+        options: dict[str, Any] = dict(
             top_k=max(1, min(top_k, 20)),
             license_classes=license_classes,
             include_compression=include_compression,
-        ):
+        )
+        extra = service.validated_filters(filters)
+        extra.pop("exclude_retracted", None)
+        options.update(extra)
+        options["license_classes"] = external_filters(
+            {"license_classes": options.get("license_classes")}
+        )["license_classes"]
+        async for event in service.answer_stream(query, **options):
             if event.type == "delta":
                 text_parts.append(event.data["text"])
             elif event.type == "citations":
@@ -152,7 +185,9 @@ def build_mcp_server(
         source: authors, year, DOI, license class, where it came from, and
         the first chunks of its text.
         """
-        document, chunks = await service.get_document(document_id)
+        document, chunks = await service.get_document(
+            document_id, scope=RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)
+        )
         return {
             "id": document.id,
             "title": document.title,
@@ -188,6 +223,7 @@ def build_mcp_server(
         """
         limit = max(1, min(limit, 100))
         conditions = [
+            entity_scope_condition(RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)),
             KgEntity.canonical_entity_id.is_(None),
             or_(
                 KgEntity.name.ilike(f"%{name_contains}%"),
@@ -218,14 +254,21 @@ def build_mcp_server(
             ]
         }
 
-    async def get_citations(document_id: str) -> dict[str, Any]:
+    async def get_citations(
+        document_id: str, license_classes: list[str] | None = None, sources: list[str] | None = None
+    ) -> dict[str, Any]:
         """Inspect a document's references and the corpus documents that cite it.
 
         Use after get_document when following scientific provenance in either
         direction. Resolved references include corpus document titles and ids;
         unresolved Crossref DOI pointers remain visible with resolved=false.
         """
-        return await service.get_citations(document_id)
+        return await service.get_citations(
+            document_id,
+            scope=service.scope_from(
+                **external_filters({"license_classes": license_classes, "sources": sources})
+            ),
+        )
 
     async def get_entity_relationships(entity_name: str) -> dict[str, Any]:
         """Show every stated relationship of one entity, with evidence quotes.
@@ -239,13 +282,16 @@ def build_mcp_server(
                 await session.execute(
                     select(KgEntity)
                     .where(
+                        entity_scope_condition(
+                            RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)
+                        ),
                         or_(
                             func.lower(KgEntity.name) == entity_name.lower(),
                             text(
                                 "EXISTS (SELECT 1 FROM unnest(kg_entities.aliases) alias "
                                 "WHERE lower(alias) = lower(:entity_name))"
                             ).bindparams(entity_name=entity_name),
-                        )
+                        ),
                     )
                     .order_by(
                         case(
@@ -273,7 +319,14 @@ def build_mcp_server(
                         "hint": "Entity canonicalization cycle detected; run sci-rag doctor.",
                     }
                 seen_ids.add(entity.id)
-                canonical = await session.get(KgEntity, entity.canonical_entity_id)
+                canonical = await session.scalar(
+                    select(KgEntity).where(
+                        KgEntity.id == entity.canonical_entity_id,
+                        entity_scope_condition(
+                            RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)
+                        ),
+                    )
+                )
                 if canonical is None:
                     return {
                         "entity": entity_name,
@@ -285,10 +338,13 @@ def build_mcp_server(
                 (
                     await session.execute(
                         select(KgRelationship).where(
+                            relationship_scope_condition(
+                                RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)
+                            ),
                             or_(
                                 KgRelationship.source_entity_id == entity.id,
                                 KgRelationship.target_entity_id == entity.id,
-                            )
+                            ),
                         )
                     )
                 )
@@ -299,9 +355,19 @@ def build_mcp_server(
             names = {
                 row.id: row.name
                 for row in (
-                    await session.execute(select(KgEntity).where(KgEntity.id.in_(ids)))
+                    await session.execute(
+                        select(KgEntity).where(
+                            KgEntity.id.in_(ids),
+                            entity_scope_condition(
+                                RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES)
+                            ),
+                        )
+                    )
                 ).scalars()
             }
+            edges = [
+                e for e in edges if e.source_entity_id in names and e.target_entity_id in names
+            ]
         return {
             "entity": entity.name,
             "found": True,
@@ -326,7 +392,7 @@ def build_mcp_server(
         example "county_reports" vs "extension_notes") before filtering a
         search by source or license.
         """
-        stats = await service.stats()
+        stats = await service.stats(scope=RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES))
         return {
             "sources": stats["sources"],
             "license_classes": stats["license_classes"],
@@ -340,14 +406,78 @@ def build_mcp_server(
         A fast first call to judge whether this knowledge base is worth
         querying for a given topic, and to detect an empty or stale corpus.
         """
-        stats = await service.stats()
+        stats = await service.stats(scope=RetrievalScope(license_classes=EXTERNAL_SAFE_CLASSES))
         return {"domain": service.domain.name, **stats}
 
+    async def get_related_documents(
+        document_id: str,
+        relation: str = "all",
+        limit: int = 8,
+        license_classes: list[str] | None = None,
+        sources: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Inspect similar files, literal references, and project peers after search.
+
+        Both endpoints and evidence obey the supplied scope. A similarity score
+        is not a factual link. Follow returned document ids to inspect evidence;
+        use get_document_versions when the question needs a latest revision.
+        Empty or missing evidence is a gap, not permission to invent an answer.
+        """
+        return await service.get_related_documents(
+            document_id,
+            relation=relation,
+            limit=limit,
+            scope=service.scope_from(
+                **external_filters({"license_classes": license_classes, "sources": sources})
+            ),
+        )
+
+    async def get_document_versions(
+        document_id: str,
+        license_classes: list[str] | None = None,
+        sources: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Explicitly inspect retained revisions and select the current evidence.
+
+        This history operation includes old revisions but retains the other
+        visibility filters. Missing predecessor ids are not fabricated.
+        """
+        return await service.get_document_versions(
+            document_id,
+            scope=service.scope_from(
+                **external_filters({"license_classes": license_classes, "sources": sources})
+            ),
+        )
+
+    async def browse_corpus(
+        dimension: str = "documents",
+        by: str | None = None,
+        filters: dict[str, Any] | None = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        """Browse documents or project/time/named-topic facets with the same filters as REST."""
+        return await service.browse_corpus(
+            dimension=dimension,
+            by=by,
+            filters=external_filters(filters),
+            page=page,
+            page_size=page_size,
+        )
+
+    async def list_projects(filters: dict[str, Any] | None = None) -> dict[str, Any]:
+        """List only projects with visible current documents and their scoped counts."""
+        return await service.list_projects(filters=external_filters(filters))
+
     tools: dict[str, Callable[..., Awaitable[Any]]] = {
+        "browse_corpus": browse_corpus,
+        "list_projects": list_projects,
         "search_corpus": search_corpus,
         "answer_question": answer_question,
         "get_document": get_document,
         "get_citations": get_citations,
+        "get_related_documents": get_related_documents,
+        "get_document_versions": get_document_versions,
         "search_entities": search_entities,
         "get_entity_relationships": get_entity_relationships,
         "list_sources": list_sources,

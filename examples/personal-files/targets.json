@@ -1,0 +1,115 @@
+{
+  "status": "AI-authored provisional labels; independent human review pending",
+  "license": "Synthetic text released as CC0; names are fictional",
+  "scope": "Target-entity recall, ownership, and source-grounded cross-file paths; not a representative quality benchmark",
+  "documents": [
+    {
+      "path": "atlas/plan.md",
+      "title": "Atlas Plan",
+      "project": "Atlas",
+      "body": "陈林负责 Atlas 项目。Atlas 项目使用知识图谱。Atlas 项目产出 Atlas实验计划。",
+      "entities": [
+        [
+          "陈林",
+          "Person"
+        ],
+        [
+          "Atlas",
+          "Project"
+        ],
+        [
+          "知识图谱",
+          "Technology"
+        ],
+        [
+          "Atlas实验计划",
+          "Document"
+        ]
+      ]
+    },
+    {
+      "path": "inbox/review.docx",
+      "title": "Atlas Review",
+      "project": "Atlas",
+      "body": "Atlas实验计划由陈林撰写。Atlas实验计划属于 Atlas 项目。陈林评审 Atlas实验计划。",
+      "entities": [
+        [
+          "陈林",
+          "Person"
+        ],
+        [
+          "Atlas",
+          "Project"
+        ],
+        [
+          "Atlas实验计划",
+          "Document"
+        ]
+      ]
+    },
+    {
+      "path": "atlas/course-note.txt",
+      "title": "Horizon Notes",
+      "project": "Horizon",
+      "manual": true,
+      "body": "Horizon 项目由王宁负责。Horizon 项目使用自然语言处理。王宁制作检索原型。",
+      "entities": [
+        [
+          "Horizon",
+          "Project"
+        ],
+        [
+          "王宁",
+          "Person"
+        ],
+        [
+          "自然语言处理",
+          "Technology"
+        ],
+        [
+          "检索原型",
+          "Artifact"
+        ]
+      ]
+    },
+    {
+      "path": "horizon/slides.pptx",
+      "title": "Horizon Slides",
+      "project": "Horizon",
+      "body": "检索原型由王宁制作。检索原型属于 Horizon 项目。Horizon 项目使用自然语言处理。",
+      "entities": [
+        [
+          "Horizon",
+          "Project"
+        ],
+        [
+          "王宁",
+          "Person"
+        ],
+        [
+          "自然语言处理",
+          "Technology"
+        ],
+        [
+          "检索原型",
+          "Artifact"
+        ]
+      ]
+    },
+    {
+      "path": "inbox/reminder.txt",
+      "title": "General Reminder",
+      "project": null,
+      "body": "例行备忘: 定期检查本地备份, 并整理已经完成的日常事项。本页没有声明任何项目归属。",
+      "entities": []
+    },
+    {
+      "path": "inbox/unknown-rights.txt",
+      "title": "Unclassified Rights",
+      "project": null,
+      "license_class": "unknown",
+      "body": "这是一份生成的未知授权样例。其内容不应被发送给模型。",
+      "entities": []
+    }
+  ]
+}

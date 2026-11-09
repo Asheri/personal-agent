@@ -236,14 +236,17 @@ class _BlockExtractor(HTMLParser):
         self._flush_text()
 
 
-def render_pipe_table(rows: list[list[str]], *, header: bool) -> str:
+def render_pipe_table(
+    rows: list[list[str]], *, header: bool, preserve_empty_rows: bool = False
+) -> str:
     """Render collected cells as a Markdown pipe table.
 
     The chunker already keeps pipe tables intact and flags them `is_table`, so
     matching that shape means an HTML table travels the same path a Markdown
     one does instead of needing its own handling.
     """
-    rows = [row for row in rows if any(cell.strip() for cell in row)]
+    if not preserve_empty_rows:
+        rows = [row for row in rows if any(cell.strip() for cell in row)]
     if not rows:
         return ""
     width = max(len(row) for row in rows)

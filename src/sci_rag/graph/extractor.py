@@ -25,16 +25,36 @@ from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import Row, bindparam, func, or_, select, text, update
+from sqlalchemy import Row, bindparam, delete, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql.sqltypes import Text as TextType
 
-from sci_rag.db.models import Chunk, Document, KgEntity, KgRelationship
+from sci_rag.db.models import (
+    Chunk,
+    Document,
+    EntityResolutionAudit,
+    KgCommunity,
+    KgEntity,
+    KgRelationship,
+)
 from sci_rag.domain import DomainProfile
+from sci_rag.licensing import EXTERNAL_SAFE_CLASSES
 from sci_rag.llm import LLMClient
+from sci_rag.versions import lock_document_writes
 
 log = structlog.get_logger(__name__)
+
+
+async def reset_graph(session_factory: async_sessionmaker[AsyncSession]) -> None:
+    """Clear derived graph data for an explicit ontology rebuild, retaining audits."""
+    async with session_factory() as session:
+        await lock_document_writes(session)
+        for model in (KgCommunity, KgRelationship, KgEntity):
+            await session.execute(delete(model))
+        await session.execute(update(Chunk).values(graph_extracted_at=None))
+        await session.commit()
+
 
 _MAX_PASSAGE_CHARS = 4000
 _MAX_NAME_LEN = 200
@@ -74,10 +94,17 @@ class ExtractionStats:
     entities_created: int = 0
     entities_updated: int = 0
     relationships_created: int = 0
+    entities_dropped: int = 0
+    aliases_dropped: int = 0
+    relationships_dropped: int = 0
+    exact_merges: int = 0
+    chunks_skipped_outbound: int = 0
+    stale_batches: int = 0
+    domain_digest: str = ""
 
 
 def parse_extraction(
-    payload: Any, domain: DomainProfile, batch_size: int
+    payload: Any, domain: DomainProfile, batch_size: int, *, stats: ExtractionStats | None = None
 ) -> tuple[list[ExtractedEntity], list[ExtractedRelationship]]:
     """Validate a model response against the domain ontology.
 
@@ -91,22 +118,71 @@ def parse_extraction(
 
     entities: list[ExtractedEntity] = []
     seen_names: dict[str, ExtractedEntity] = {}
-    for raw in payload.get("entities", []) or []:
+    original_names: dict[str, str] = {}
+    entity_specs = {e.name: e for e in domain.config.entity_types}
+    relation_specs = {r.name: r for r in domain.config.relation_types}
+    raw_entities = payload.get("entities", []) or []
+    raw_relationships = payload.get("relationships", []) or []
+    if not isinstance(raw_entities, list):
+        if stats is not None:
+            stats.entities_dropped += 1
+        raw_entities = []
+    if not isinstance(raw_relationships, list):
+        if stats is not None:
+            stats.relationships_dropped += 1
+        raw_relationships = []
+    for raw in raw_entities:
         if not isinstance(raw, dict):
+            if stats is not None:
+                stats.entities_dropped += 1
             continue
-        name = str(raw.get("name", "")).strip()
+        original_name = str(raw.get("name", "")).strip()
+        name = original_name
         canonical_type = entity_types.get(str(raw.get("type", "")).strip().lower())
         if not name or len(name) > _MAX_NAME_LEN or canonical_type is None:
+            if stats is not None:
+                stats.entities_dropped += 1
             continue
+        if canonical_type == "Document" and name.casefold() in {
+            "本文件",
+            "该文件",
+            "本文",
+            "this document",
+            "this file",
+        }:
+            if stats is not None:
+                stats.entities_dropped += 1
+            continue
+        if canonical_type == "Document" and name.startswith("《") and name.endswith("》"):
+            name = name[1:-1].strip()
+        for suffix, minimum in entity_specs[canonical_type].canonical_suffixes.items():
+            if suffix and name.casefold().endswith(suffix.casefold()):
+                stem = name[: -len(suffix)].strip()
+                if len(stem) >= minimum:
+                    name = stem
+                    break
+        if not name:
+            if stats is not None:
+                stats.entities_dropped += 1
+            continue
+        original_names[original_name.lower()] = name
         passages = [
             p for p in (raw.get("passages") or []) if isinstance(p, int) and 1 <= p <= batch_size
         ]
+        raw_aliases = raw.get("aliases")
+        aliases = raw_aliases if isinstance(raw_aliases, list) else []
         entity = ExtractedEntity(
             name=name,
             entity_type=canonical_type,
             description=str(raw.get("description", "")).strip()[:500],
             passages=passages,
-            aliases=_parse_aliases(raw.get("aliases"), canonical_name=name),
+            aliases=_parse_aliases(
+                [
+                    *aliases,
+                    *([original_name] if original_name != name else []),
+                ],
+                canonical_name=name,
+            ),
         )
         key = name.lower()
         if key in seen_names:
@@ -120,11 +196,15 @@ def parse_extraction(
             entities.append(entity)
 
     relationships: list[ExtractedRelationship] = []
-    for raw in payload.get("relationships", []) or []:
+    for raw in raw_relationships:
         if not isinstance(raw, dict):
+            if stats is not None:
+                stats.relationships_dropped += 1
             continue
         source = str(raw.get("source", "")).strip()
         target = str(raw.get("target", "")).strip()
+        source = original_names.get(source.lower(), source)
+        target = original_names.get(target.lower(), target)
         canonical_type = relation_types.get(str(raw.get("type", "")).strip().lower())
         passage = raw.get("passage")
         if (
@@ -133,6 +213,17 @@ def parse_extraction(
             or target.lower() not in seen_names
             or source.lower() == target.lower()
         ):
+            if stats is not None:
+                stats.relationships_dropped += 1
+            continue
+        spec = relation_specs[canonical_type]
+        if (
+            spec.source_types and seen_names[source.lower()].entity_type not in spec.source_types
+        ) or (
+            spec.target_types and seen_names[target.lower()].entity_type not in spec.target_types
+        ):
+            if stats is not None:
+                stats.relationships_dropped += 1
             continue
         relationships.append(
             ExtractedRelationship(
@@ -183,11 +274,14 @@ async def extract_graph(
     rate_limit_s: float = 0.2,
     max_chunks: int | None = None,
 ) -> ExtractionStats:
-    stats = ExtractionStats()
+    from sci_rag.evals.report import domain_digest
+
+    stats = ExtractionStats(domain_digest=domain_digest(domain.directory))
     async with session_factory() as session:
         statement = (
             select(Chunk.id, Chunk.document_id, Chunk.content)
             .join(Document, Document.id == Chunk.document_id)
+            .where(Document.is_current.is_(True))
             .order_by(Document.content_hash, Chunk.chunk_index)
         )
         if not reprocess_all:
@@ -195,6 +289,15 @@ async def extract_graph(
         if max_chunks:
             statement = statement.limit(max_chunks)
         pending = (await session.execute(statement)).all()
+        allowed_ids = set(
+            (
+                await session.scalars(
+                    select(Document.id).where(Document.license_class.in_(EXTERNAL_SAFE_CLASSES))
+                )
+            ).all()
+        )
+        stats.chunks_skipped_outbound = sum(row[1] not in allowed_ids for row in pending)
+        pending = [row for row in pending if row[1] in allowed_ids]
 
     if not pending:
         log.info("graph_extract_nothing_to_do")
@@ -252,8 +355,8 @@ async def _extract_with_recovery(
     is bounded and a rerun repeats the same sequence rather than sampling.
     """
     try:
-        await _extract_batch(batch, session_factory, llm, domain, stats)
-        stats.chunks_processed += len(batch)
+        if await _extract_batch(batch, session_factory, llm, domain, stats):
+            stats.chunks_processed += len(batch)
         return
     except ValueError as exc:
         if len(batch) == 1:
@@ -263,7 +366,6 @@ async def _extract_with_recovery(
                 batch=_batch_id(batch),
                 batch_size=1,
                 error=type(exc).__name__,
-                detail=str(exc)[:200],
             )
             return
         stats.batches_split += 1
@@ -280,7 +382,6 @@ async def _extract_with_recovery(
             batch=_batch_id(batch),
             batch_size=len(batch),
             error=type(exc).__name__,
-            detail=str(exc)[:200],
         )
         return
 
@@ -299,7 +400,7 @@ async def _extract_batch(
     llm: LLMClient,
     domain: DomainProfile,
     stats: ExtractionStats,
-) -> None:
+) -> bool:
     passages = "\n\n".join(
         f"{i}. {content[:_MAX_PASSAGE_CHARS]}" for i, (_, _, content) in enumerate(batch, start=1)
     )
@@ -311,7 +412,14 @@ async def _extract_batch(
         PASSAGES=passages,
     )
     payload = await llm.generate_json(prompt, max_tokens=8192)
-    entities, relationships = parse_extraction(payload, domain, len(batch))
+    if not isinstance(payload, dict) or any(
+        not isinstance(payload.get(k, []), list) for k in ("entities", "relationships")
+    ):
+        raise ValueError("Invalid extraction containers")
+    entities, relationships = parse_extraction(payload, domain, len(batch), stats=stats)
+    entities, relationships = _ground_extraction(
+        entities, relationships, [row[2][:_MAX_PASSAGE_CHARS] for row in batch], stats
+    )
 
     chunk_id_by_passage = {i: row[0] for i, row in enumerate(batch, start=1)}
     document_id_by_passage = {i: row[1] for i, row in enumerate(batch, start=1)}
@@ -319,6 +427,21 @@ async def _extract_batch(
     batch_document_ids = sorted({row[1] for row in batch})
 
     async with session_factory() as session:
+        await lock_document_writes(session)
+        current_ids = set(
+            (
+                await session.scalars(
+                    select(Document.id).where(
+                        Document.id.in_(batch_document_ids),
+                        Document.is_current.is_(True),
+                        Document.license_class.in_(EXTERNAL_SAFE_CLASSES),
+                    )
+                )
+            ).all()
+        )
+        if current_ids != set(batch_document_ids):
+            stats.stale_batches += 1
+            return False
         entity_ids = await _upsert_entities(
             session,
             entities,
@@ -331,12 +454,67 @@ async def _extract_batch(
         await _insert_relationships(
             session, relationships, entity_ids, chunk_id_by_passage, document_id_by_passage, stats
         )
+        person_documents = {
+            document_id_by_passage[p]
+            for entity in entities
+            if entity.entity_type == "Person"
+            for p in entity.passages
+            if p in document_id_by_passage
+        }
+        for document_id in person_documents:
+            document = await session.get(Document, document_id)
+            if document is not None:
+                document.extra = {**document.extra, "person_entities_source": "graph_chunks"}
         await session.execute(
             update(Chunk)
             .where(Chunk.id.in_(batch_chunk_ids))
             .values(graph_extracted_at=datetime.now(UTC))
         )
         await session.commit()
+    return True
+
+
+def _ground_extraction(
+    entities: list[ExtractedEntity],
+    relationships: list[ExtractedRelationship],
+    passages: list[str],
+    stats: ExtractionStats,
+) -> tuple[list[ExtractedEntity], list[ExtractedRelationship]]:
+    """Reject unsupported provenance instead of repairing a model's facts."""
+
+    def folded(value: str) -> str:
+        return "".join(value.casefold().split())
+
+    texts = {i: folded(value) for i, value in enumerate(passages, 1)}
+    grounded: list[ExtractedEntity] = []
+    for entity in entities:
+        claimed = entity.passages or list(texts)
+        aliases = [a for a in entity.aliases if any(folded(a) in texts[p] for p in claimed)]
+        stats.aliases_dropped += len(entity.aliases) - len(aliases)
+        names = [folded(entity.name), *(folded(a) for a in aliases)]
+        supported = [p for p in claimed if any(name in texts[p] for name in names)]
+        if not supported:
+            stats.entities_dropped += 1
+            continue
+        entity.aliases, entity.passages = aliases, supported
+        grounded.append(entity)
+    by_name = {e.name.lower(): e for e in grounded}
+    edges: list[ExtractedRelationship] = []
+    for edge in relationships:
+        source, target = by_name.get(edge.source.lower()), by_name.get(edge.target.lower())
+        quote = folded(edge.evidence)
+        if (
+            source is None
+            or target is None
+            or edge.passage not in source.passages
+            or edge.passage not in target.passages
+            or not quote
+            or quote not in texts[edge.passage]
+        ):
+            stats.relationships_dropped += 1
+            continue
+        edges.append(edge)
+    return grounded, edges
 
 
 async def _upsert_entities(
@@ -416,6 +594,7 @@ async def _upsert_entities(
         row = existing.get(typed_name)
         if row is None:
             if entity.name.lower() in exact_name_rows:
+                stats.entities_dropped += 1
                 log.warning(
                     "entity_type_conflict",
                     existing_type=exact_name_rows[entity.name.lower()].entity_type,
@@ -435,6 +614,18 @@ async def _upsert_entities(
             existing[typed_name] = row
             stats.entities_created += 1
         else:
+            if row.name.casefold() == entity.name.casefold():
+                session.add(
+                    EntityResolutionAudit(
+                        merged_entity_id=row.id,
+                        merged_entity_name=entity.name,
+                        surviving_entity_id=row.id,
+                        surviving_entity_name=row.name,
+                        method="exact",
+                        confidence=1.0,
+                    )
+                )
+                stats.exact_merges += 1
             merged_chunks = list(dict.fromkeys([*(row.chunk_ids or []), *chunk_ids]))
             merged_documents = list(dict.fromkeys([*(row.document_ids or []), *document_ids]))
             changed = merged_chunks != (row.chunk_ids or []) or merged_documents != (
@@ -483,11 +674,13 @@ async def _insert_relationships(
     document_id_by_passage: dict[int, str],
     stats: ExtractionStats,
 ) -> None:
+    before_count = len(relationships)
     relationships = [
         relationship
         for relationship in relationships
         if relationship.source.lower() in entity_ids and relationship.target.lower() in entity_ids
     ]
+    stats.relationships_dropped += before_count - len(relationships)
     if not relationships:
         return
     involved = {entity_ids[r.source.lower()] for r in relationships} | {

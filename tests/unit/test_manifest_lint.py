@@ -153,8 +153,8 @@ def test_an_unsupported_file_type_is_an_error(tmp_path: Path) -> None:
     """Not in the issue's list, but it fails ingestion as surely as a missing file."""
     path = _manifest(
         tmp_path,
-        '{"path": "notes.docx", "title": "Wrong Type"}',
-        files=("notes.docx",),
+        '{"path": "notes.doc", "title": "Wrong Type"}',
+        files=("notes.doc",),
     )
     report = lint_manifest(path)
 

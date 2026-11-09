@@ -37,6 +37,7 @@ from sci_rag.db.models import (
     KgEntity,
     KgRelationship,
 )
+from sci_rag.versions import lock_document_writes, reconnect_deleted_versions
 
 log = structlog.get_logger(__name__)
 
@@ -70,85 +71,91 @@ class GcOutcome:
         )
 
 
-async def delete_documents(
-    session_factory: async_sessionmaker[AsyncSession], document_ids: list[str]
+async def delete_documents_in_session(
+    session: AsyncSession, document_ids: list[str]
 ) -> DeleteOutcome:
-    """Delete documents and every graph trace of their evidence, atomically."""
+    """Delete using the caller transaction; the caller must commit or roll back."""
     outcome = DeleteOutcome()
     targets = [d for d in dict.fromkeys(document_ids) if d]
     if not targets:
         return outcome
-    async with session_factory() as session:
-        found = set(
-            (await session.execute(select(Document.id).where(Document.id.in_(targets))))
-            .scalars()
-            .all()
-        )
-        if not found:
-            return outcome
-        doomed_chunks = set(
-            (await session.execute(select(Chunk.id).where(Chunk.document_id.in_(found))))
-            .scalars()
-            .all()
-        )
-        outcome.citations_deleted = int(
-            await session.scalar(
-                select(func.count(DocumentCitation.id)).where(
-                    (DocumentCitation.citing_document_id.in_(found))
-                    | (DocumentCitation.cited_document_id.in_(found))
-                )
+    await lock_document_writes(session)
+    found = set(
+        (await session.execute(select(Document.id).where(Document.id.in_(targets)))).scalars().all()
+    )
+    if not found:
+        return outcome
+    await reconnect_deleted_versions(session, found)
+    doomed_chunks = set(
+        (await session.execute(select(Chunk.id).where(Chunk.document_id.in_(found))))
+        .scalars()
+        .all()
+    )
+    outcome.citations_deleted = int(
+        await session.scalar(
+            select(func.count(DocumentCitation.id)).where(
+                (DocumentCitation.citing_document_id.in_(found))
+                | (DocumentCitation.cited_document_id.in_(found))
             )
-            or 0
         )
+        or 0
+    )
 
-        # Relationships evidenced by the doomed documents or chunks.
-        relationship_result = cast(
+    # Relationships evidenced by the doomed documents or chunks.
+    relationship_result = cast(
+        "CursorResult[Any]",
+        await session.execute(
+            delete(KgRelationship).where(
+                (KgRelationship.document_id.in_(found))
+                | (KgRelationship.chunk_id.in_(doomed_chunks) if doomed_chunks else False)
+            )
+        ),
+    )
+    outcome.relationships_deleted = relationship_result.rowcount or 0
+
+    # Scrub evidence arrays; remember which entities were touched.
+    affected_entity_ids: list[str] = []
+    entities = (
+        (await session.execute(select(KgEntity).where(KgEntity.document_ids.overlap(list(found)))))
+        .scalars()
+        .all()
+    )
+    for entity in entities:
+        entity.document_ids = [d for d in entity.document_ids if d not in found]
+        entity.chunk_ids = [c for c in entity.chunk_ids if c not in doomed_chunks]
+        entity.description = None
+        entity.aliases = []
+        affected_entity_ids.append(entity.id)
+    outcome.entities_scrubbed = len(entities)
+
+    # Communities that aggregated evidence from those entities: their
+    # summaries were written from content that is being deleted.
+    if affected_entity_ids:
+        community_result = cast(
             "CursorResult[Any]",
             await session.execute(
-                delete(KgRelationship).where(
-                    (KgRelationship.document_id.in_(found))
-                    | (KgRelationship.chunk_id.in_(doomed_chunks) if doomed_chunks else False)
+                delete(KgCommunity).where(
+                    KgCommunity.member_entity_ids.overlap(affected_entity_ids)
                 )
             ),
         )
-        outcome.relationships_deleted = relationship_result.rowcount or 0
+        outcome.communities_deleted = community_result.rowcount or 0
 
-        # Scrub evidence arrays; remember which entities were touched.
-        affected_entity_ids: list[str] = []
-        entities = (
-            (
-                await session.execute(
-                    select(KgEntity).where(KgEntity.document_ids.overlap(list(found)))
-                )
-            )
-            .scalars()
-            .all()
-        )
-        for entity in entities:
-            entity.document_ids = [d for d in entity.document_ids if d not in found]
-            entity.chunk_ids = [c for c in entity.chunk_ids if c not in doomed_chunks]
-            affected_entity_ids.append(entity.id)
-        outcome.entities_scrubbed = len(entities)
+    document_result = cast(
+        "CursorResult[Any]",
+        await session.execute(delete(Document).where(Document.id.in_(found))),
+    )
+    outcome.documents_deleted = document_result.rowcount or 0
+    outcome.chunks_deleted = len(doomed_chunks)
+    return outcome
 
-        # Communities that aggregated evidence from those entities: their
-        # summaries were written from content that is being deleted.
-        if affected_entity_ids:
-            community_result = cast(
-                "CursorResult[Any]",
-                await session.execute(
-                    delete(KgCommunity).where(
-                        KgCommunity.member_entity_ids.overlap(affected_entity_ids)
-                    )
-                ),
-            )
-            outcome.communities_deleted = community_result.rowcount or 0
 
-        document_result = cast(
-            "CursorResult[Any]",
-            await session.execute(delete(Document).where(Document.id.in_(found))),
-        )
-        outcome.documents_deleted = document_result.rowcount or 0
-        outcome.chunks_deleted = len(doomed_chunks)
+async def delete_documents(
+    session_factory: async_sessionmaker[AsyncSession], document_ids: list[str]
+) -> DeleteOutcome:
+    """Delete documents and every graph trace of their evidence, atomically."""
+    async with session_factory() as session:
+        outcome = await delete_documents_in_session(session, document_ids)
         await session.commit()
     log.info(
         "corpus_delete",

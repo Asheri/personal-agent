@@ -29,6 +29,12 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from sci_rag.cli.agent import app as agent_app
+from sci_rag.cli.browse import app as browse_app
+from sci_rag.cli.projects import app as project_app
+from sci_rag.cli.refresh import app as refresh_app
+from sci_rag.cli.relations import app as relation_app
+
 if TYPE_CHECKING:
     from sci_rag.campaigns.screen import ScreeningReport
 
@@ -59,6 +65,11 @@ graph_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(graph_app, name="graph", rich_help_panel=PANEL_BUILD)
+app.add_typer(project_app, name="project", rich_help_panel=PANEL_BUILD)
+app.add_typer(relation_app, name="relate", rich_help_panel=PANEL_ASK)
+app.add_typer(browse_app, name="browse", rich_help_panel=PANEL_ASK)
+app.add_typer(refresh_app, name="refresh", rich_help_panel=PANEL_MAINTAIN)
+app.add_typer(agent_app, name="agent", rich_help_panel=PANEL_MAINTAIN)
 eval_app = typer.Typer(
     help=(
         "Measure quality against your seed questions: retrieval scores, what each "
@@ -262,10 +273,11 @@ def _scope(  # type: ignore[no-untyped-def]
     journals: str | None = None,
     exclude_dois: str | None = None,
     exclude_retracted: bool = False,
+    filters: str | None = None,
 ):
     from sci_rag.retrieve import RetrievalScope
 
-    return RetrievalScope(
+    scope = RetrievalScope(
         license_classes=_csv(license_classes) if license_classes else None,
         sources=_csv(sources) if sources else None,
         year_min=year_min,
@@ -275,6 +287,19 @@ def _scope(  # type: ignore[no-untyped-def]
         exclude_dois=_csv(exclude_dois),
         exclude_retracted=exclude_retracted,
     )
+    if filters is not None:
+        from dataclasses import replace
+
+        from sci_rag.server.service import RagService
+
+        values = RagService.validated_filters(json.loads(filters))
+        for key, value in list(values.items()):
+            if isinstance(value, list):
+                values[key] = tuple(value)
+        if exclude_retracted:
+            values["exclude_retracted"] = True
+        scope = replace(scope, **values)
+    return scope
 
 
 @db_app.command("upgrade")
@@ -310,59 +335,77 @@ def _ingest_and_report(  # type: ignore[no-untyped-def]
 ):
     """Load the documents, ingest them, print the report; shared by ingest and build."""
     from sci_rag.config import get_settings
+    from sci_rag.db import get_session_factory
     from sci_rag.embed import get_embedder
-    from sci_rag.ingest import discover_folder, ingest_entries, load_manifest
+    from sci_rag.ingest import discover_folder, load_manifest
+    from sci_rag.reconcile import ReconcileBusyError, reconcile_entries
 
     if (path is None) == (manifest is None):
         raise typer.BadParameter("Provide exactly one of: a folder PATH, or --manifest FILE.")
+    if path is not None and not path.is_dir():
+        raise typer.BadParameter("Folder PATH must be an existing directory.")
+    root = manifest.parent if manifest is not None else path
+    assert root is not None
     entries = load_manifest(manifest) if manifest else discover_folder(path, source=source)  # type: ignore[arg-type]
-    if not entries:
-        if manifest is not None:
-            hint = f"[yellow]Nothing to ingest: {manifest} lists no documents.[/yellow]"
-            proposed = manifest.with_name(manifest.name + ".proposed")
-            if proposed.exists():
-                hint += (
-                    f"\nA drafted manifest is waiting at [bold]{proposed}[/bold]. Review it, "
-                    f"set each row's license_class, then move it over {manifest.name}."
-                )
-            else:
-                hint += (
-                    "\nAdd one JSON line per document, or draft the file from a folder with "
-                    "[bold]sci-rag draft manifest --folder data/raw[/bold]."
-                )
+    if not entries and manifest is not None:
+        hint = f"[yellow]Nothing to ingest: {manifest} lists no documents.[/yellow]"
+        proposed = manifest.with_name(manifest.name + ".proposed")
+        if proposed.exists():
+            hint += (
+                f"\nA drafted manifest is waiting at [bold]{proposed}[/bold]. Review it, "
+                f"set each row's license_class, then move it over {manifest.name}."
+            )
         else:
-            hint = (
-                f"[yellow]Nothing to ingest: no supported files under {path}.[/yellow]\n"
-                "Supported: PDF, HTML, Markdown, and plain text."
+            hint += (
+                "\nAdd one JSON line per document, or draft the file from a folder with "
+                "[bold]sci-rag draft manifest --folder data/raw[/bold]."
             )
         console.print(hint)
         raise typer.Exit(1)
-    console.print(f"Ingesting [bold]{len(entries)}[/bold] document(s)...")
+    console.print(f"Reconciling [bold]{len(entries)}[/bold] source file(s)...")
 
     async def run():  # type: ignore[no-untyped-def]
         await _check_db()
         # Built inside the coroutine so a missing credential reaches run_async's
         # short message instead of surfacing as a traceback.
         embedder = get_embedder(get_settings())
-        return await ingest_entries(
+        return await reconcile_entries(
             entries,
+            root=root,
+            session_factory=get_session_factory(),
             embedder=embedder,
             target_tokens=chunk_tokens,
             overlap_tokens=overlap_tokens,
             prefer_docling=not no_docling,
         )
 
-    report = run_async(run())
+    try:
+        report = run_async(run())
+    except ReconcileBusyError:
+        console.print("[yellow]Another reconcile is already running for this database.[/yellow]")
+        raise typer.Exit(2) from None
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]Reconcile could not proceed ({type(exc).__name__}).[/red]")
+        raise typer.Exit(1) from None
 
-    table = Table(title="Ingestion report")
+    table = Table(title="Source reconciliation report")
     table.add_column("Document")
     table.add_column("Status")
     table.add_column("Chunks", justify="right")
     table.add_column("Detail")
     for outcome in report.outcomes:
-        color = {"ingested": "green", "skipped_duplicate": "yellow", "failed": "red"}[
-            outcome.status
-        ]
+        color = {
+            "added": "green",
+            "updated": "green",
+            "failed": "red",
+            "removed": "magenta",
+            "unchanged": "dim",
+            "verify": "yellow",
+            "metadata_only": "cyan",
+            "out_of_scope": "dim",
+            "no_path_recorded": "yellow",
+            "placeholder_skipped": "yellow",
+        }[outcome.status]
         table.add_row(
             Path(outcome.path).name,
             f"[{color}]{outcome.status}[/{color}]",
@@ -370,6 +413,18 @@ def _ingest_and_report(  # type: ignore[no-untyped-def]
             outcome.detail,
         )
     console.print(table)
+    console.print(f"Source files: {len(report.source_outcomes)}; counts: {report.counts()}")
+    for parser, counts in sorted(report.parser_counts().items()):
+        console.print(
+            f"parser={parser} ok={counts['ok']} failed={counts['failed']} skipped={counts['skipped']}"
+        )
+    from sci_rag.ingest.report import write_parser_summary
+
+    summary_path = write_parser_summary(report)
+    console.print(f"Parser summary: {summary_path}")
+    console.print(
+        f"Database rows examined: {report.database_rows_seen}; counts: {report.counts(database=True)}"
+    )
     console.print(
         f"[green]{report.ingested} ingested[/green], "
         f"[yellow]{report.skipped} skipped[/yellow], "
@@ -381,7 +436,7 @@ def _ingest_and_report(  # type: ignore[no-untyped-def]
 @app.command(rich_help_panel=PANEL_BUILD)
 def ingest(
     path: Path | None = typer.Argument(
-        None, help="Folder of documents to ingest (PDF, HTML, Markdown, or plain text)."
+        None, help="Folder of supported local files (documents, mail, code, data, and OCR images)."
     ),
     manifest: Path | None = typer.Option(
         None,
@@ -398,7 +453,7 @@ def ingest(
     chunk_tokens: int = typer.Option(800, help="Target tokens per chunk."),
     overlap_tokens: int = typer.Option(150, help="Overlap tokens between chunks."),
 ) -> None:
-    """Ingest documents: parse, chunk, embed, and store them.
+    """Reconcile sources: skip unchanged files, retain revisions, remove missing sources.
 
     Pass a folder for a first run (every document is recorded with
     license_class "unknown"), or a manifest once you have declared each
@@ -419,7 +474,7 @@ def ingest(
 @app.command(rich_help_panel=PANEL_BUILD)
 def build(
     path: Path | None = typer.Argument(
-        None, help="Folder of documents to ingest (PDF, HTML, Markdown, or plain text)."
+        None, help="Folder of supported local files (documents, mail, code, data, and OCR images)."
     ),
     manifest: Path | None = typer.Option(
         None,
@@ -438,7 +493,7 @@ def build(
     ),
     batch_size: int = typer.Option(10, help="Chunks per graph-extraction model call."),
 ) -> None:
-    """Build the knowledge base in one go: ingest, then extract the graph and its summaries.
+    """Build the knowledge base: reconcile sources, then update the graph and summaries.
 
     Ingestion works with any embedding setup, including offline. The graph
     steps need LLM provider credentials; without them, or with --no-graph, they are
@@ -471,8 +526,11 @@ def build(
         extraction = _run_graph_extract(batch_size=batch_size, reprocess_all=False, max_chunks=None)
         if extraction.batches_failed:
             failed = True
-        console.print("Summarizing entity clusters...")
-        _run_graph_communities(min_size=3)
+        if getattr(report, "graph_changed", True) or getattr(extraction, "chunks_processed", 0):
+            console.print("Summarizing entity clusters...")
+            _run_graph_communities(min_size=3)
+        else:
+            console.print("[dim]No graph changes; keeping existing community summaries.[/dim]")
 
     console.print(
         '\nDone. Ask a question with [bold]sci-rag answer "..."[/bold], or see what came back '
@@ -562,6 +620,9 @@ def retrieve(
         "--explain-routing",
         help="Print what the auto router decides for this query (and why) before retrieving.",
     ),
+    filters: str | None = typer.Option(
+        None, help="JSON corpus filters, including document dates, projects, and tags."
+    ),
 ) -> None:
     """Search the corpus and show the evidence: which layer found each result, and why it ranked."""
     from sci_rag.retrieve import Retriever
@@ -586,6 +647,7 @@ def retrieve(
                 authors=authors,
                 journals=journals,
                 exclude_dois=exclude_dois,
+                filters=filters,
             ),
         )
         return result, decision
@@ -692,6 +754,9 @@ def answer(
             "Omit to use the domain profile's setting."
         ),
     ),
+    filters: str | None = typer.Option(
+        None, help="JSON corpus filters, including document dates, projects, and tags."
+    ),
 ) -> None:
     """Answer a question from your documents, with numbered citations. Needs LLM provider credentials."""
     from sci_rag.answer import AnswerEngine
@@ -713,6 +778,7 @@ def answer(
                 journals=journals,
                 exclude_dois=exclude_dois,
                 exclude_retracted=not include_retracted,
+                filters=filters,
             ),
             include_compression=include_compression,
         ):
@@ -768,6 +834,9 @@ def _run_graph_extract(*, batch_size: int, reprocess_all: bool, max_chunks: int 
 
     stats_result = run_async(run())
     console.print(
+        f"Domain digest: {stats_result.domain_digest}; rejected entities: {stats_result.entities_dropped}; rejected relationships: {stats_result.relationships_dropped}; exact merges: {stats_result.exact_merges}; outbound skips: {stats_result.chunks_skipped_outbound}."
+    )
+    console.print(
         f"Processed [bold]{stats_result.chunks_processed}[/bold] chunk(s): "
         f"[green]{stats_result.entities_created} entities created[/green], "
         f"{stats_result.entities_updated} enriched, "
@@ -807,6 +876,22 @@ def graph_extract(
     )
     if stats_result.batches_failed:
         raise typer.Exit(1)
+
+
+@graph_app.command("reset")
+def graph_reset(
+    yes: bool = typer.Option(False, "--yes", help="Confirm removal of derived graph data."),
+) -> None:
+    """Clear derived entities, edges, and communities before an ontology rebuild."""
+    if not yes:
+        raise typer.BadParameter(
+            "Use --yes to confirm removal of derived graph data; keep a database backup."
+        )
+    from sci_rag.db import get_session_factory
+    from sci_rag.graph.extractor import reset_graph
+
+    run_async(reset_graph(get_session_factory()))
+    console.print("Derived graph cleared; documents, ownership, and audit receipts retained.")
 
 
 def _run_graph_communities(*, min_size: int):  # type: ignore[no-untyped-def]
@@ -1979,8 +2064,7 @@ def corpus_export(
     license_classes: list[str] = typer.Option(
         [],
         "--license",
-        help="Export only these license classes (repeatable). Omit for everything. "
-        "An export is a redistribution, so a scope excludes 'unknown' unless you name it.",
+        help="Export external-safe license classes (repeatable). Omit for public/open_commercial. Unknown and restricted rights are excluded.",
     ),
     include_embeddings: bool = typer.Option(
         False, "--include-embeddings", help="Include chunk vectors (large, rarely wanted)."
@@ -2001,7 +2085,12 @@ def corpus_export(
         console.print(f"[red]Unknown format {fmt!r}.[/red] Known: {', '.join(FORMATS)}")
         raise typer.Exit(1)
 
-    scope = RetrievalScope(license_classes=tuple(license_classes)) if license_classes else None
+    from sci_rag.licensing import EXTERNAL_SAFE_CLASSES
+
+    requested = license_classes if license_classes else EXTERNAL_SAFE_CLASSES
+    scope = RetrievalScope(
+        license_classes=tuple(value for value in requested if value in EXTERNAL_SAFE_CLASSES)
+    )
 
     async def run():  # type: ignore[no-untyped-def]
         await _check_db()
@@ -2164,6 +2253,11 @@ def stats() -> None:
         KgRelationship,
         get_session_factory,
     )
+    from sci_rag.retrieve.types import (
+        RetrievalScope,
+        entity_scope_condition,
+        relationship_scope_condition,
+    )
 
     async def run():  # type: ignore[no-untyped-def]
         await _check_db()
@@ -2176,33 +2270,50 @@ def stats() -> None:
                 ("relationships", KgRelationship),
                 ("communities", KgCommunity),
             ):
-                counts[label] = await session.scalar(select(func.count(model.id)))
+                query = select(func.count(model.id))
+                if model is Document:
+                    query = query.where(Document.is_current.is_(True))
+                elif model is Chunk:
+                    query = query.join(Document).where(Document.is_current.is_(True))
+                elif model is KgEntity:
+                    query = query.where(entity_scope_condition(RetrievalScope()))
+                elif model is KgRelationship:
+                    query = query.where(relationship_scope_condition(RetrievalScope()))
+                counts[label] = await session.scalar(query)
             by_license = (
                 await session.execute(
-                    select(Document.license_class, func.count(Document.id)).group_by(
-                        Document.license_class
-                    )
+                    select(Document.license_class, func.count(Document.id))
+                    .where(Document.is_current.is_(True))
+                    .group_by(Document.license_class)
                 )
             ).all()
             versions = (
                 await session.execute(
-                    select(Chunk.embedding_version, func.count(Chunk.id)).group_by(
-                        Chunk.embedding_version
-                    )
+                    select(Chunk.embedding_version, func.count(Chunk.id))
+                    .join(Document)
+                    .where(Document.is_current.is_(True))
+                    .group_by(Chunk.embedding_version)
                 )
             ).all()
             confidence = {
                 "direct": await session.scalar(
-                    select(func.count(KgRelationship.id)).where(KgRelationship.confidence >= 0.85)
+                    select(func.count(KgRelationship.id)).where(
+                        relationship_scope_condition(RetrievalScope()),
+                        KgRelationship.confidence >= 0.85,
+                    )
                 ),
                 "strong": await session.scalar(
                     select(func.count(KgRelationship.id)).where(
                         KgRelationship.confidence >= 0.55,
+                        relationship_scope_condition(RetrievalScope()),
                         KgRelationship.confidence < 0.85,
                     )
                 ),
                 "inferred": await session.scalar(
-                    select(func.count(KgRelationship.id)).where(KgRelationship.confidence < 0.55)
+                    select(func.count(KgRelationship.id)).where(
+                        relationship_scope_condition(RetrievalScope()),
+                        KgRelationship.confidence < 0.55,
+                    )
                 ),
             }
         return counts, by_license, versions, confidence

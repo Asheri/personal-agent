@@ -24,6 +24,7 @@ entity_types:
   - name: Organization
     description: "A company, institution, team, or group the owner works with"
   - name: Project
+    canonical_suffixes: {项目: 1, " project": 1}
     description: "A work unit the owner pursues (research topic, client job, course, long-term task)"
   - name: Document
     description: "A work artifact discussed inside the text (a report, deck, paper, contract)"
@@ -34,6 +35,7 @@ entity_types:
   - name: Artifact
     description: "A concrete deliverable or tool (dataset, prototype, slide deck, codebase)"
   - name: Technology
+    canonical_suffixes: {技术: 4}
     description: "A method, framework, model, or tool named as a technique"
   - name: Place
     description: "A location (city, campus, office, venue)"
@@ -50,14 +52,21 @@ entity_types:
 # into, a file version chain (same source path, different revisions).
 relation_types:
   - name: AUTHORED_BY
+    source_types: [Document, Artifact]
+    target_types: [Person, Organization]
     description: "A document or artifact was written by a person or organization"
   - name: MENTIONS
     description: "A document or artifact refers to another entity"
   - name: PART_OF
+    target_types: [Project, Event]
     description: "An entity belongs to a project or event (person to project, artifact to project)"
   - name: PRODUCES
+    source_types: [Person, Project, Event]
+    target_types: [Artifact, Document, Metric]
     description: "A person, project, or event yields an artifact, document, or metric"
   - name: USES
+    source_types: [Person, Project, Artifact]
+    target_types: [Technology, Artifact, Place]
     description: "A person, project, or artifact relies on a technology, artifact, or place"
   - name: PRECEDES
     description: "One event or time period happens before another"
@@ -73,27 +82,25 @@ relation_types:
     description: "A decision was made in an event or time period"
 
 # Query classes steer HyDE. Keywords are matched against the user's question.
-# Known gap (spec 4.4): the router tokenizes ASCII words only, so Chinese
-# keywords are inert until the Chinese keyword spike lands; keep them for
-# documentation and future use, and do not rely on class routing for Chinese.
+# Chinese keyword cues use literal substring matching; English cues retain word boundaries.
 query_classes:
   - name: locating
-    keywords: [file, find, where, latest, newest, version, report, deck, notes, locate]
+    keywords: [file, find, where, latest, newest, version, report, deck, notes, locate, 查找, 最新, 版本, 文件, 报告, 材料]
     hyde_instruction: >-
       Write as a file index entry would: name the file or document, the project
       it belongs to, where it lives, and what it contains.
   - name: project
-    keywords: [project, belongs, part, client, course, topic, working, about]
+    keywords: [project, belongs, part, client, course, topic, working, about, 项目, 归属, 属于, 课题, 客户]
     hyde_instruction: >-
       Write as a project dossier would: name the project, its members, its
       deliverables, and the period it was active.
   - name: person
-    keywords: [who, person, author, wrote, meeting, contact, colleague, with]
+    keywords: [who, person, author, wrote, meeting, contact, colleague, with, 谁, 人物, 作者, 联系人, 同事]
     hyde_instruction: >-
       Write as a contact summary would: name the person, their organization,
       their role, and which documents or events involve them.
   - name: timeline
-    keywords: [when, timeline, history, last, ago, month, year, progress, busy]
+    keywords: [when, timeline, history, last, ago, month, year, progress, busy, 时间, 历史, 进展, 时间线, 月份, 年份]
     hyde_instruction: >-
       Write as a work journal would: give dates, events in order, and what was
       produced in each period.

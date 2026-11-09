@@ -32,7 +32,11 @@ def run_migrations_offline() -> None:
 
 
 def _do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        version_table_schema=config.attributes.get("version_table_schema"),
+    )
     with context.begin_transaction():
         context.run_migrations()
 
@@ -47,7 +51,11 @@ async def _run_async_migrations() -> None:
 
 
 def run_migrations_online() -> None:
-    asyncio.run(_run_async_migrations())
+    connection = config.attributes.get("connection")
+    if connection is not None:
+        _do_run_migrations(connection)
+    else:
+        asyncio.run(_run_async_migrations())
 
 
 if context.is_offline_mode():

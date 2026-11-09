@@ -169,6 +169,73 @@ uv run pytest tests/unit -q
 
 ## 6. 任务台账
 
+Scoped serial follow-up (2026-10-26): course engineering is the v1.8 candidate.
+See `docs/core-completion.md`, `docs/engineering-requirements.md`, ADR 0020, and
+the dated review template. Revisions 0012/0013 add dates/access and refresh audit.
+Browse/refresh/Agent routes and external-safe MCP defaults are implemented.
+Current exact evidence is in `.context/core-completion-20261026/`; historical
+checkboxes below remain a record, not the current acceptance matrix. Independent
+review/adoption, representative human assessment, optional P6 research, and course
+deliverables remain separate. No parallel project branch or persistent task is
+created by acceptance. Continue from the new serial handoff, not the desktop copy.
+
+Scoped serial follow-up (2026-10-25): remaining local file families are a v1.7
+candidate. See `docs/file-types.md`, ADR 0019, and the dated candidate/review.
+XLSX, EML/MBOX, code, text data, and optional printed-text OCR share the existing
+chunk/version/scope pipeline. Mailbox writes and absent-member deletion are one
+transaction. Content-key fallback replaces the contradictory no-ID ordinal rule;
+full code chunks retain body evidence. Schema remains 0011. Formal nonauthor
+adoption is pending; no project commit, merge, or parallel branch is implied.
+The initial English-only marker search exposed an existing punctuation/query
+dispatch limit; retain failed evidence and report the two query routes separately.
+
+Scoped serial follow-up (2026-10-25): Chinese retrieval and controlled real-model
+quality are the v1.6 candidate. See `docs/chinese-retrieval.md`, the 24-query spike,
+`docs/personal-quality.md`, ADRs 0017/0018, and the dated review template. Revision
+0011 backfills a separate Chinese keyword index. The personal ontology declares
+name suffix and endpoint type contracts; all extraction domains now require
+literal passage provenance. Controlled generation/semantic-embedding runs retain
+failed trials and raw outputs. Repeated constructed-corpus scores are provisional,
+not blinded field accuracy. Group nonauthor adoption remains pending. No parallel
+branch, merge, automatic trigger, full browse, or external Agent deployment is implied.
+
+Scoped serial follow-up (2026-10-25): document relation views and Agent interfaces
+are a v1.5 candidate; see `docs/document-relations.md`, ADR 0016, and the dated review.
+Schema 0010 adds versioned document means and literal mention provenance. CLI/REST/MCP
+share visible-corpus reads and explicit history access. The user authorized an isolated
+D-drive PostgreSQL acceptance run for this stage; no model download or paid calls.
+The prior deferred reconcile cases are exercised on this new candidate, not relabeled
+as old-snapshot evidence. Real-model answer quality, Chinese keyword work, external
+Agent deployment, update triggers, full browsing, and nonauthor adoption remain open.
+
+Scoped serial follow-up (2026-10-24): on-demand incremental reconciliation is a
+v1.4 candidate; see `docs/incremental-reconcile.md`, ADR 0013, and the dated review.
+Ingest/build use checked pending writes, stat hints, conservative missing-source
+deletion, and separate source/database reports. The user deferred sample testing:
+only code/static checks run this stage; database acceptance, model examples,
+trigger integration, and formal nonauthor review remain pending. Earlier 240-test
+database results do not validate this changed code. No new branch or merge is implied.
+After each test run, archive and verify its evidence, stop owned services, and
+remove dedicated temporary data and models that are not needed for later tests.
+Keep source, regression fixtures, reports, reproduction metadata, and shared dependencies.
+All generated files, dependencies, and temporary data must stay under D:/Codex.
+
+Scoped serial follow-up (2026-10-24): personal extraction and project ownership are
+implemented as a v1.3 candidate. See `docs/personal-extraction.md`, ADR 0015, and
+`docs/superpowers/specs/reviews/2026-10-24-personal-extraction-review.md`.
+The reviewed baseline remains v1.1; v1.2 and v1.3 await real nonauthor review.
+The controlled real-model sample uses provisional labels and does not establish
+representative course quality. Filesystem reconciliation, scheduling, full browsing,
+and the remaining course evaluation remain open. Continue from this serial handoff.
+
+Scoped serial handoff (2026-10-24): identity/version revision 0008, current-evidence
+filtering, and safe rollback are implemented as a v1.2 candidate. See
+`docs/document-versions.md` and
+`docs/superpowers/specs/reviews/2026-10-24-identity-versions-review.md`.
+Formal nonauthor review remains pending. This does not complete the full M-0008-R,
+project classification, filesystem reconciliation, scheduling, or F6 tasks below.
+The team uses serial handoffs; historical branch references are not active parallel tasks.
+
 > 维护规则：认领标注 `@名字 (日期)`；完成后整条移入 §6.1 并补「验证证据」；
 > 阻塞项写明阻塞原因与解除条件。验收依据列指向规格附录 A 的判据编号。
 
@@ -212,6 +279,10 @@ uv run pytest tests/unit -q
 - [ ] F1 解析面：`parse_file_many`、Office 三件套、邮件（一文件多文档）、OCR 协议、
       占位文件 owner + 第 10 类状态 `placeholder_skipped`、失败统计持久化（汇总表 + 退出码）
       验收：A1-1 至 A1-7
+      Scoped update (2026-10-21): DOCX/PPTX parsing is implemented with AI assistance;
+      see `docs/office-parsers.md`. Independent review is pending. Full F1 remains open.
+      Follow-up (2026-10-23): Office table backslash/pipe escaping is fixed;
+      rerun evidence is linked from `docs/office-parsers.md`. Group review remains pending.
 - [ ] F2 抽取面：本体换代重建路径（graph gc/extract --all/resolve/communities）、
       项目三来源（manual>rule>inferred + 锁定）、标签分列、同名合并审计收据、
       ExtractionStats 丢弃计数、`project` 命令组（面板归属）。验收：A2-1 至 A2-8

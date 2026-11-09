@@ -7,12 +7,12 @@ L4: L4_raw_sessions/ 历史会话
 
 文件记忆: pcmem_sop(检索/问答/浏览/增量命令, 中文降级坑, 历史版本不可见)
 知识库: personal-agent 主仓库, 个人域 domain-personal/(SCI_RAG_DOMAIN_DIR 切换), 出厂域 domain/ 供测试
-记忆路由: plugins/pcmem_router.py(hooks 事件), 调用记录 memory/router_events.log
+记忆路由: plugins/pcmem_router.py(hooks 事件), 调用记录 memory/router_events.jsonl
 
 [RULES]
 1. 文件事实查知识库, 经验与偏好写 GA 记忆; 文件内容禁抄入 L1-L3, 只存指针(doc id/project_id)
 2. 写记忆前读 META-SOP; memory 下只 patch 不 overwrite; 禁把推测写成用户要求
 3. 未查证不断言; 「未搜到」不等于「不存在」
 4. 密钥文件仅引用不读取(.env, mykey.py)
-5. 中文 keyword 层 spike 未过前空候选属已知降级, 走向量层并声明
+5. 中文与编号检索已有受控验证; 空候选仍检查 trace 与来源, 不当成整体质量已验收
 6. 历史版本默认不可见是基线谓词, 不是 bug; 查旧版用版本读取入口

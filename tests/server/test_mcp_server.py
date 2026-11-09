@@ -15,10 +15,14 @@ from sci_rag.server import build_mcp_server
 pytestmark = pytest.mark.integration
 
 EXPECTED_TOOLS = [
+    "browse_corpus",
+    "list_projects",
     "search_corpus",
     "answer_question",
     "get_document",
     "get_citations",
+    "get_related_documents",
+    "get_document_versions",
     "search_entities",
     "get_entity_relationships",
     "list_sources",
@@ -50,6 +54,7 @@ async def test_tool_inventory_and_schemas(service) -> None:  # type: ignore[no-u
         "year_min",
         "year_max",
         "journals",
+        "filters",
     }
 
     resources = await mcp.list_resources()
@@ -153,15 +158,21 @@ async def test_entity_tools_follow_resolution_tombstones(service) -> None:  # ty
 
 
 async def test_entity_relationship_lookup_prefers_exact_name_over_alias(service) -> None:  # type: ignore[no-untyped-def]
+    from sqlalchemy import select
+
     from sci_rag.db import KgEntity, get_session_factory
 
     async with get_session_factory()() as session:
+        source = await session.scalar(select(KgEntity).where(KgEntity.name == "rice straw"))
+        assert source is not None
         session.add(
             KgEntity(
                 id="f" * 32,
                 name="Paddy Straw",
                 entity_type="Feedstock",
                 aliases=[],
+                document_ids=list(source.document_ids),
+                chunk_ids=list(source.chunk_ids),
             )
         )
         await session.commit()

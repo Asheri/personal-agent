@@ -29,10 +29,12 @@ profiles can coexist; only one is active per run.
 
 ## Known gaps (do not pretend otherwise)
 
-1. Chinese keyword layer: the query router tokenizes ASCII words, so class
-   routing is inert for Chinese questions until the Chinese keyword spike
-   (spec 4.4) lands. Vector retrieval covers Chinese in the meantime.
+1. Chinese keyword indexing, class matching, and routing are implemented in the
+   v1.6 candidate. See `docs/chinese-retrieval.md` for migration 0011 and the
+   controlled semantic-vector spike. Large-corpus and field quality remain unverified.
 2. Compression defaults are validated on the demo corpus only. Re-run the
    paired gate on personal files before trusting `relevance_floor: 0.0`.
-3. `project_inference.md` and `tag_extraction.md` have no caller yet; they ship
-   now so the prompts are reviewed before the P2 code exists.
+3. The project and tag passes now call their prompts through `sci_rag.projects`.
+   See `docs/personal-extraction.md` for source priority, rights gating, and the
+   provisional sample. Shared runtime prompts are copied from the demo profile;
+   formal nonauthor review and representative personal-file quality evaluation remain open.

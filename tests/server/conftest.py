@@ -10,10 +10,11 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 
 from sci_rag.answer import AnswerEngine
 from sci_rag.config import Settings
-from sci_rag.db import KgEntity, KgRelationship, get_session_factory, session_scope
+from sci_rag.db import Chunk, KgEntity, KgRelationship, get_session_factory, session_scope
 from sci_rag.domain import load_domain
 from sci_rag.ingest import ingest_entries, load_manifest
 from sci_rag.llm import LLMClient
@@ -73,13 +74,25 @@ async def service(database, clean_tables, local_embedder):  # type: ignore[no-un
     assert report.failed == 0
     # A tiny hand-planted graph so entity tools have something to serve.
     async with session_scope() as db:
+        document_id = report.outcomes[0].document_id
+        chunk_id = await db.scalar(
+            select(Chunk.id).where(Chunk.document_id == document_id).limit(1)
+        )
+        assert document_id is not None and chunk_id is not None
         straw = KgEntity(
             name="rice straw",
             entity_type="Feedstock",
             description="residue",
             aliases=["paddy straw"],
+            document_ids=[document_id],
+            chunk_ids=[chunk_id],
         )
-        digestion = KgEntity(name="anaerobic digestion", entity_type="ConversionProcess")
+        digestion = KgEntity(
+            name="anaerobic digestion",
+            entity_type="ConversionProcess",
+            document_ids=[document_id],
+            chunk_ids=[chunk_id],
+        )
         db.add_all([straw, digestion])
         await db.flush()
         db.add(
@@ -88,6 +101,8 @@ async def service(database, clean_tables, local_embedder):  # type: ignore[no-un
                 target_entity_id=digestion.id,
                 relation_type="CONVERTED_BY",
                 evidence="rice straw can be digested",
+                document_id=document_id,
+                chunk_id=chunk_id,
             )
         )
     llm = ServerMockLLM()

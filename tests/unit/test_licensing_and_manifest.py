@@ -54,7 +54,7 @@ def test_manifest_rejects_bad_json(tmp_path: Path) -> None:
 def test_discover_folder_finds_supported_files_only(tmp_path: Path) -> None:
     (tmp_path / "a.txt").write_text("text")
     (tmp_path / "b.md").write_text("# md")
-    (tmp_path / "c.docx").write_text("nope")
+    (tmp_path / "c.doc").write_text("nope")
     (tmp_path / "nested").mkdir()
     (tmp_path / "nested" / "d.pdf").write_bytes(b"%PDF-1.4 fake")
     entries = discover_folder(tmp_path, source="demo")

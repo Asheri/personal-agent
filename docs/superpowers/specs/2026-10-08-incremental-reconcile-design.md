@@ -1,5 +1,12 @@
 # 增量更新设计：文档级 reconcile
 
+> Scoped supersession (2026-10-24): this historical proposal is preserved.
+> The v1.4 candidate and ADR 0013 replace its deletion-on-update/global-hash
+> assumptions with retained revisions, checked PendingIngest, metadata signatures,
+> and conservative missing-source deletion. The current-evidence community filter
+> removes the need for automatic global GC. Actual database/sample acceptance and
+> nonauthor review remain deferred; the historical approval below is not new approval.
+
 - 日期：2026-10-08
 - 状态：已批准（分 5 节逐节确认）
 - 决策：**自研 reconcile，不接入 CocoIndex**

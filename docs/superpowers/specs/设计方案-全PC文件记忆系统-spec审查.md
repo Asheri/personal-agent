@@ -106,3 +106,31 @@ OCR 选型、中文 spike 延续 `[待实测/待 spike]`；worktree 分支 recon
   重分类为新增 API。判据修正版收录：A2-8（同名合并+审计）、A3-2/A3-9（可断言化）、
   A4-1（`empty` 判失败）、A6-2/A6-6（版本链语义下改写）。
 - 后续修订须在本文件追加记录，不改写历史条目（沿用旧评审的 supersede 纪律）。
+
+- **v1.2 candidate** (2026-10-24): the scoped identity/version implementation and
+  proposed corrections are in `2026-10-24-identity-version-spec-v1.2.md` and ADR 0014.
+  Content-hash uniqueness is replaced by source-identity/current-row constraints;
+  incompatible downgrade refuses data loss. The inventory snapshot is explicitly
+  distinguished from a database backup. This is a pending AI-assisted candidate,
+  not an independently approved revision. The v1.1 review above is unchanged.
+
+- **v1.3 candidate** (2026-10-24): personal projects/tags, exact-name extraction
+  receipts, rejection statistics, and scoped migration 0009 are proposed in
+  `2026-10-24-personal-extraction-spec-v1.3.md` and ADR 0015. The old graph-gc
+  rebuild assumption is corrected by an explicit confirmed reset. Shared personal
+  runtime prompts are completed. The real-model sample has provisional labels;
+  neither representative quality nor independent approval is claimed.
+
+- **v1.4 candidate** (2026-10-24): scoped on-demand reconciliation is proposed in
+  `2026-10-24-incremental-reconcile-spec-v1.4.md` and ADR 0013. Checked pending writes,
+  stat/configuration hints, current metadata refresh, bounded missing-source deletion,
+  and a database reconcile lock are implemented. The user deferred sample testing;
+  database acceptance and real concurrency/crash validation are not passing evidence.
+  v1.1 remains the reviewed baseline; this note is not independent approval.
+
+- **v1.5 candidate** (2026-10-25): document means and literal citation evidence,
+  scoped four-kind relation reads, and shared REST/MCP interfaces are proposed in
+  `2026-10-25-document-relations-spec-v1.5.md` and ADR 0016. The user authorized an
+  isolated local database run; actual outcomes are in the dated handoff. Controlled
+  vectors and API checks do not establish Chinese retrieval, real-model accuracy,
+  external Agent deployment, or independent adoption. v1.1 remains the reviewed baseline.

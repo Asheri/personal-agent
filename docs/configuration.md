@@ -20,6 +20,9 @@ renderer, including commented optional values.
 | Environment variable | Type | Default | Purpose |
 |---|---|---|---|
 | `SCI_RAG_DATABASE_URL` | str | postgresql+asyncpg://sci_rag:sci_rag@localhost:5433/sci_rag | Async SQLAlchemy URL for Postgres with pgvector. |
+| `SCI_RAG_OCR_TESSERACT_CMD` | str \| NoneType | unset | Optional native Tesseract executable path; unset searches PATH. OCR is local and requires installed language data. |
+| `SCI_RAG_OCR_TESSDATA_DIR` | Path \| NoneType | unset | Optional directory containing Tesseract traineddata files. Unset uses the native runtime default. |
+| `SCI_RAG_OCR_LANGUAGES` | str | chi_sim+eng | Tesseract language identifiers joined by +; defaults to simplified Chinese and English. |
 | `SCI_RAG_GOOGLE_API_KEY` | str \| NoneType | unset | Alternative Google AI Studio key. Also set SCI_RAG_LLM_PROVIDER=google to switch generation. |
 | `SCI_RAG_GCP_PROJECT` | str \| NoneType | unset | Google Cloud project used for Vertex AI credentials. |
 | `SCI_RAG_GCP_LOCATION` | str | us-central1 | Vertex AI region. |
@@ -97,12 +100,15 @@ each entry.
 | `entity_types` | list[EntityTypeSpec] | [] | Ontology concepts the graph extractor may emit. |
 | `entity_types[].name` | str | required | Canonical entity-type identifier used in prompts and validation. |
 | `entity_types[].description` | str | "" | Domain explanation sent to the extraction model. |
+| `entity_types[].canonical_suffixes` | dict[str, Annotated[int, Gt(gt=0)]] | {} | Optional trailing suffix to minimum remaining-name length; original forms stay source-checked aliases. |
 | `relation_types` | list[RelationTypeSpec] | [] | Directed relationship types the graph extractor may emit. |
 | `relation_types[].name` | str | required | Canonical relation identifier. |
 | `relation_types[].description` | str | "" | Meaning of source RELATION target for the model. |
+| `relation_types[].source_types` | list[str] | [] | Allowed source entity types; an empty list leaves this endpoint unrestricted. |
+| `relation_types[].target_types` | list[str] | [] | Allowed target entity types; invalid directions are rejected, never flipped. |
 | `query_classes` | list[QueryClassSpec] | [] | Keyword-routed question families used to shape HyDE passages. |
 | `query_classes[].name` | str | required | Query-class identifier. |
-| `query_classes[].keywords` | list[str] | [] | Lowercase terms matched against tokenized questions. |
+| `query_classes[].keywords` | list[str] | [] | English word cues or literal Chinese keyword cues matched against the question. |
 | `query_classes[].hyde_instruction` | str | "" | Domain-specific style for the hypothetical evidence passage. |
 | `retrieval` | RetrievalTuning | see nested fields | Fusion, candidate, graph-confidence, and optional reranker tuning. |
 | `retrieval.weights` | dict[str, float] | {"community": 0.6, "graph": 0.8, "hyde": 1.2, "keyword": 1.0, "vector": 1.5} | Per-layer multipliers used by weighted reciprocal rank fusion. |

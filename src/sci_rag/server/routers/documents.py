@@ -7,6 +7,8 @@ metadata; the detail view previews its chunks.
 
 from __future__ import annotations
 
+from typing import Annotated, Any
+
 from fastapi import APIRouter, Query, Request
 
 from sci_rag.db.models import Chunk, Document
@@ -83,4 +85,37 @@ def _preview(chunk: Chunk, chars: int = 240) -> ChunkPreview:
         section_path=chunk.section_path,
         is_table=chunk.is_table,
         preview=text[:chars] + ("..." if len(text) > chars else ""),
+    )
+
+
+@router.get("/v1/documents/{document_id}/related")
+async def related_documents(
+    document_id: str,
+    request: Request,
+    relation: str = Query("all", pattern="^(all|similar|citations|projects)$"),
+    limit: int = Query(8, ge=1, le=100),
+    license_classes: Annotated[list[str] | None, Query()] = None,
+    sources: Annotated[list[str] | None, Query()] = None,
+    auth: AuthContext = require_scopes("corpus:read"),
+) -> dict[str, Any]:
+    service: RagService = request.app.state.service
+    return await service.get_related_documents(
+        document_id,
+        relation=relation,
+        limit=limit,
+        scope=service.scope_from(license_classes, sources),
+    )
+
+
+@router.get("/v1/documents/{document_id}/versions")
+async def document_versions(
+    document_id: str,
+    request: Request,
+    license_classes: Annotated[list[str] | None, Query()] = None,
+    sources: Annotated[list[str] | None, Query()] = None,
+    auth: AuthContext = require_scopes("corpus:read"),
+) -> dict[str, Any]:
+    service: RagService = request.app.state.service
+    return await service.get_document_versions(
+        document_id, scope=service.scope_from(license_classes, sources)
     )

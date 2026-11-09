@@ -202,6 +202,10 @@ async def apply_reindex(
             for chunk, vector in zip(chunks, vectors, strict=True):
                 chunk.embedding = embedder.assert_dimension(vector)
                 chunk.embedding_version = version
+            from sci_rag.relate.vectors import refresh_document_embedding
+
+            for document_id in {chunk.document_id for chunk in chunks}:
+                await refresh_document_embedding(session, document_id)
             await session.commit()
         outcome.chunks_reembedded += len(chunks)
         outcome.batches += 1

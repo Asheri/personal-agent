@@ -1,0 +1,6 @@
+- project: Atlas
+  include: ["*/atlas/*"]
+  priority: 10
+- project: Horizon
+  include: ["*/horizon/*"]
+  priority: 10

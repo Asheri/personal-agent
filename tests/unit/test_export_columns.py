@@ -31,6 +31,14 @@ EXPECTED = {
         "license_class",
         "license_source",
         "content_hash",
+        "version_seq",
+        "is_current",
+        "project_id",
+        "project_source",
+        "tags",
+        "auto_tags",
+        "doc_date",
+        "doc_date_source",
         "page_count",
         "chunk_count",
         "extra",
@@ -84,6 +92,13 @@ def test_the_exported_columns_are_the_ones_we_intend(table: str) -> None:
 def test_the_search_vector_is_never_exported() -> None:
     """A generated tsvector is a Postgres index artifact, not corpus data."""
     assert "search_tsv" not in exported_columns("chunks", include_embeddings=True)
+    assert {"search_tokens", "search_zh_tsv"}.isdisjoint(
+        exported_columns("chunks", include_embeddings=True)
+    )
+
+
+def test_internal_identity_and_hidden_predecessor_ids_are_not_exported() -> None:
+    assert {"identity_key", "version_of"}.isdisjoint(exported_columns("documents"))
 
 
 def test_embeddings_are_off_by_default_and_on_by_request() -> None:
@@ -169,12 +184,12 @@ def cli_export(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
     return recorder
 
 
-def test_no_license_flag_means_unrestricted(cli_export: _Recorder, tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_no_license_flag_means_external_safe_scope(cli_export: _Recorder, tmp_path) -> None:  # type: ignore[no-untyped-def]
     result = runner.invoke(app, ["corpus", "export", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
-    assert cli_export.kwargs["scope"] is None
-    assert "Scoped export" not in result.output
+    assert cli_export.kwargs["scope"].license_classes == ("public", "open_commercial")
+    assert "Scoped export" in result.output
 
 
 def test_a_license_flag_becomes_a_fail_closed_allowlist(cli_export: _Recorder, tmp_path) -> None:  # type: ignore[no-untyped-def]

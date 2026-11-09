@@ -46,6 +46,10 @@ minutes.
   from a results table still carries the heading that says what it measured.
   Each document also records its authors, its source, and whether its text
   may be redistributed, and a file ingested twice is recognized and skipped.
+  The PC-Mem candidate also supports Office, mail, code, text data, and local
+  printed-text OCR; see [local file types](docs/file-types.md) for setup and limits.
+  [Core engineering](docs/core-completion.md) adds scoped browsing, one-shot
+  automatic refresh entry points, and pointer-only Agent memory integration.
 - **One database.** Passages, vectors, a full-text index, and the concept
   graph all live in PostgreSQL with the pgvector extension. That is a
   deliberate choice over a separate vector store or graph database: it
