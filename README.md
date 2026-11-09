@@ -68,8 +68,9 @@ Of the 13 Alembic revisions, 6 are new.
 
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) holds both notices, including
 the full MIT text for the copied GenericAgent files.
-[AUTHORS.md](AUTHORS.md) names the three contributors of record and says which
-part of the tree each one produced.
+[AUTHORS.md](AUTHORS.md) names the credits and says which part of the tree each
+one produced; the v1.2 to v1.8 implementation that arrived as handoffs is
+recorded there as an undetermined author, open to be claimed.
 
 ## Components
 

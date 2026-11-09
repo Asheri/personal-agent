@@ -19,7 +19,7 @@ PC-Mem 把个人电脑里散落的文件整理成 Agent 能长期记住的知识
 
 比例并不均衡：`src/` 下共 30,463 行，本仓库新增或重写的约 5,300 行，占 17%；其余随 fork 一起进来。13 个 Alembic 迁移里有 6 个是新的。
 
-两家的许可证声明见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)，其中包含 GenericAgent 的 MIT 全文与文件级 blob 校验值。三位作者的署名与各自负责的部分见 [`AUTHORS.md`](AUTHORS.md)。
+两家的许可证声明见 [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md)，其中包含 GenericAgent 的 MIT 全文与文件级 blob 校验值。署名与各自负责的部分见 [`AUTHORS.md`](AUTHORS.md)；其中 v1.2 到 v1.8 的实现是上游交接包带来的，作者记为待定，等组内成员认领。
 
 ## 快速开始
 
