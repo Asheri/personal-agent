@@ -217,7 +217,10 @@ uv run python scripts/tasks.py --list  # every task, one line each
 The four targets whose Makefile body is a POSIX shell pipeline stay there: the
 task runner names them and exits rather than half-running them.
 [Configure Postgres backend](docs/run-postgres.md) covers Docker, a system
-server, Postgres.app, and Cloud SQL.
+server, Postgres.app, and Cloud SQL. Docker is the default backend, and it needs
+a reachable container registry: behind a network that cannot pull
+`pgvector/pgvector`, set `SCI_RAG_DB_BACKEND=local` and point
+`scripts/local_postgres.py` at an installed PostgreSQL 16 to 18 with pgvector.
 
 Two parts are bound to Windows today, and both belong to the Agent
 integration, not to the knowledge base:

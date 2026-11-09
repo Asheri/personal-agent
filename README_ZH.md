@@ -40,7 +40,7 @@ uv run python scripts/tasks.py db-up  # 三个平台
 uv run python scripts/tasks.py --list # 列出全部任务
 ```
 
-`docs`、`benchmark`、`benchmark-check`、`benchmark-refresh-graph` 四个目标在 Makefile 里是 POSIX shell 管道，仍留在 Makefile；任务入口会明确拒绝并提示改用 `make`。数据库可以用 Docker、系统安装的 PostgreSQL、macOS 上的 Postgres.app，或 Cloud SQL，见 [`docs/run-postgres.md`](docs/run-postgres.md)。
+`docs`、`benchmark`、`benchmark-check`、`benchmark-refresh-graph` 四个目标在 Makefile 里是 POSIX shell 管道，仍留在 Makefile；任务入口会明确拒绝并提示改用 `make`。数据库可以用 Docker、系统安装的 PostgreSQL、macOS 上的 Postgres.app，或 Cloud SQL，见 [`docs/run-postgres.md`](docs/run-postgres.md)。Docker 是默认后端，需要能访问容器镜像仓库；拉不到 `pgvector/pgvector` 的网络环境请把 `SCI_RAG_DB_BACKEND` 设为 `local`，让 `scripts/local_postgres.py` 使用本机已装的 PostgreSQL 16 到 18 与 pgvector。
 
 跑通个人域而不是演示域：
 
