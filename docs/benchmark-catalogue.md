@@ -1,3 +1,8 @@
+---
+title: Benchmark catalogue
+description: Which public benchmark to run, what each one tests, the GPU-hours each costs, and how to run a larger evaluation on one GPU.
+---
+
 # Benchmark catalogue
 
 Which public benchmark to run for the graph-versus-retrieval question, what each
@@ -89,6 +94,37 @@ fixed seed, and the report states it.
 
 The runner does not care where the model lives: it goes through any
 OpenAI-compatible endpoint. A GPU changes the constants, not the commands.
+
+### On a fresh host, before anything else
+
+Four things bit us on this project, so they are written down:
+
+1. **Install both extras in one command.** `uv sync` installs exactly the set
+   you name, so `uv sync --extra openai` followed later by
+   `uv sync --extra modelscope-embedding` removes the OpenAI client and the
+   next run dies with "needs the 'openai' extra". Use
+   `uv sync --extra openai --extra modelscope-embedding`.
+2. **A database with pgvector.** Either `docker compose up -d --wait` or
+   `scripts/local_postgres.py` against an installed PostgreSQL 16 to 18. On a
+   network that cannot pull images, set `SCI_RAG_DB_BACKEND=local`.
+3. **A writable data root.** `export PCMEM_DATA_DIR=/data/pcmem` (or wherever
+   the box has space). The corpus, the model cache, and the reports all live
+   under it, and the installer and fixture scripts refuse paths outside it.
+4. **A model mirror if the network needs one.** The embedder comes from
+   ModelScope, which is reachable from mainland China without a proxy; a
+   Hugging Face download would need `HF_ENDPOINT=https://hf-mirror.com`.
+   The first embedder call downloads about 1.2 GB and took 153 seconds here,
+   so do it once and keep the cache.
+
+Then check the environment before spending money:
+
+```bash
+uv run sci-rag doctor          # schema revision, ontology, model reachability
+uv run python scripts/run_benchmark_eval.py --dataset ... --corpus-dir ... --dry-run
+```
+
+The dry run writes the Markdown files and the manifest and stops, which is where
+a mismatched dataset layout shows up rather than an hour into an evaluation.
 
 ```bash
 # 1. Serve a model. AWQ keeps a 7B inside 24 GB; a 32B needs about 20 GB.
