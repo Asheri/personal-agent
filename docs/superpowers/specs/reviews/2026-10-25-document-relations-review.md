@@ -7,7 +7,7 @@
 - Status: candidate; no merge, adoption, or production deployment claim.
 
 The user authorized a task-owned local PostgreSQL run after database tests were deferred
-in the prior stage. All new data stays under D:/Codex and is removed after evidence
+in the prior stage. All new data stays under `PCMEM_DATA_DIR` and is removed after evidence
 archival and service shutdown. No model is downloaded and no paid API is called.
 
 Initial relation tests reproduce the legacy citation facade's absent scope argument.

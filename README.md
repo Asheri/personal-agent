@@ -68,6 +68,8 @@ Of the 13 Alembic revisions, 6 are new.
 
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) holds both notices, including
 the full MIT text for the copied GenericAgent files.
+[AUTHORS.md](AUTHORS.md) names the three contributors of record and says which
+part of the tree each one produced.
 
 ## Components
 
@@ -228,7 +230,7 @@ integration, not to the knowledge base:
 - `scripts/install_pcmem_agent.py` writes PowerShell launchers and a Task
   Scheduler XML file.
 - `scripts/prepare_agent_fixture.py` and `scripts/run_agent_acceptance.py`
-  assert a path under `D:/Codex` and download six upstream files.
+  require paths under `PCMEM_DATA_DIR` and download six upstream files.
 
 The knowledge base runs on all three, including
 `sci-rag refresh run --channel poll`. macOS and Linux scheduling is not

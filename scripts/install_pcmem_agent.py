@@ -16,7 +16,7 @@ from xml.sax.saxutils import escape
 def data_root() -> Path:
     """The one directory this tool may write under.
 
-    The handoff machine used a fixed `D:/Codex`. Any absolute root works now;
+    The handoff machine used a fixed local root. Any absolute root works now;
     set `PCMEM_DATA_DIR` to keep large downloads off the system drive. Without
     it, the root is `pcmem-data` in the home directory.
     """

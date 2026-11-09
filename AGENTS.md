@@ -121,7 +121,7 @@ uv run pytest tests/unit -q
 
 - `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md`（spec v1.1，独立审查「修订后放行」）
 - `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec审查.md`（审查报告与修订记录）
-- 审定原件存档于仓库外 `C:/Users/12062/OneDrive/Desktop/items/`；仓库内为工作基线副本
+- 审定原件存档于仓库外（作者本地），仓库内为工作基线副本
   （安装时 8 处 U+2014 纯标点归一，偏差见 MIGRATION.md）。
 
 ### 5.1 什么必须二次审阅
@@ -218,7 +218,7 @@ database results do not validate this changed code. No new branch or merge is im
 After each test run, archive and verify its evidence, stop owned services, and
 remove dedicated temporary data and models that are not needed for later tests.
 Keep source, regression fixtures, reports, reproduction metadata, and shared dependencies.
-All generated files, dependencies, and temporary data must stay under D:/Codex.
+All generated files, dependencies, and temporary data must stay under `PCMEM_DATA_DIR`.
 
 Scoped serial follow-up (2026-10-24): personal extraction and project ownership are
 implemented as a v1.3 candidate. See `docs/personal-extraction.md`, ADR 0015, and

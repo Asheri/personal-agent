@@ -5,7 +5,8 @@ single working home going forward.
 
 ## Migrated from sci-rag-kit (knowledge base base)
 
-Source: `C:/Users/12062/OneDrive/Desktop/items/sci-rag-kit` (main worktree).
+Source: the author's `items/sci-rag-kit` worktree, on its `main` branch. The
+originals stay outside the repository; only this copy is tracked.
 
 - Full working tree copied: `src/sci_rag/`, `tests/`, `migrations/`, `scripts/`,
   `domain/`, `data/demo/`, `data/snapshots/`, `examples/`, `docs/`, `infra/`,
@@ -23,7 +24,7 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/sci-rag-kit` (main worktree).
 
 ## Migrated from GenericAgent (memory face)
 
-Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
+Source: the author's `items/GenericAgent` worktree.
 
 - `plugins/hooks.py`, `plugins/project_mode.py` (standalone plugin bus, copied
   verbatim), plus a new `plugins/__init__.py`.
@@ -50,7 +51,7 @@ Source: `C:/Users/12062/OneDrive/Desktop/items/GenericAgent`.
 - `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec.md` (spec v1.1) and
   `docs/superpowers/specs/设计方案-全PC文件记忆系统-spec审查.md` (review report): working
   copies of the reviewed PC-Mem design artifacts. The reviewed originals stay outside
-  the repository at `C:/Users/12062/OneDrive/Desktop/items/` as the audit baseline.
+  the repository outside the tracked tree as the audit baseline.
 - Governance: every spec-derived improvement or change requires a secondary review by
   a non-author before merge (AGENTS.md section 5). Spec revisions bump the version and
   are themselves reviewed; history is superseded, never rewritten.
