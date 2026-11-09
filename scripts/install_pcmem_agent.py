@@ -40,11 +40,15 @@ def install(
     agent: Path, kb: Path, corpus: Path, python: Path, manifest: Path | None = None
 ) -> dict:
     agent, kb, corpus, python = [path.resolve() for path in [agent, kb, corpus, python]]
+    # Only the two directories this installer writes to have to sit under the
+    # data root. The knowledge base and the interpreter are read-only inputs, so
+    # a checkout that lives in a normal working directory is fine.
     root = data_root()
-    if any(not path.is_relative_to(root) for path in [agent, kb, corpus, python]):
-        raise ValueError(
-            f"Keep the installation and corpus paths under {root}; set PCMEM_DATA_DIR to change it"
-        )
+    for label, path in (("agent", agent), ("corpus", corpus)):
+        if not path.is_relative_to(root):
+            raise ValueError(
+                f"Keep the {label} directory under {root}; set PCMEM_DATA_DIR to change it"
+            )
     seeds = [
         "agent_loop.py",
         "ga.py",

@@ -369,9 +369,10 @@ What is deliberate and declared:
   data. Without them, an image source keeps its previous version and reports a
   failure.
 
-[Core engineering](docs/core-completion.md) describes the candidate, and
-[the requirement matrix](docs/engineering-requirements.md) maps each course
-requirement to the code and the evidence that supports it.
+[Core engineering](docs/core-completion.md) describes the candidate,
+[measured results](docs/verification.md) records every number with its receipt,
+and [the requirement matrix](docs/engineering-requirements.md) maps each course
+requirement to the code and the evidence behind it.
 
 ## License
 

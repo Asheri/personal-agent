@@ -74,7 +74,7 @@ uv run sci-rag doctor
 已知并已声明的边界：
 
 - **语料是合成的。** `data/demo/` 是 5 篇农业残留物短文，`data/demo-personal/` 是 20 条构造样例加 8 条对照。在它们上面算出的命中率和 F1 说明机制通了，不代表真实文件集的准确率。
-- **证据留在本地。** `.context/` 被 git 忽略，里面是这次改动的运行回执。克隆本仓库无法复核 [`docs/engineering-requirements.md`](docs/engineering-requirements.md) 里的数字。
+- **证据留在本地。** `.context/` 被 git 忽略，里面是这次改动的运行回执。克隆本仓库无法复核 [`docs/engineering-requirements.md`](docs/engineering-requirements.md) 里的数字；已实测的数字与出处集中记在 [`docs/verification.md`](docs/verification.md)。
 - **没有声称**独立审阅、真实语料部署、真实模型长期对话，或大目录性能指标。
 - **图片 OCR 是可选能力。** 需要 `ocr` extra 和带 `chi_sim` 的 Tesseract，缺了就保留旧版本并报告失败。
 - **Agent 安装器只支持 Windows。** `scripts/install_pcmem_agent.py` 生成 PowerShell 启动脚本和计划任务 XML；`scripts/prepare_agent_fixture.py` 与 `scripts/run_agent_acceptance.py` 还断言 `D:/Codex` 路径。知识库本体和 `sci-rag refresh run --channel poll` 三个平台都能跑，macOS 与 Linux 的定时封装还没有。
