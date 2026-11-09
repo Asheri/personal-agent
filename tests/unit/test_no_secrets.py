@@ -69,9 +69,11 @@ def test_an_explicit_allow_comment_passes(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     "body, label",
     [
-        ("aws = 'AKIAIOSFODNN7EXAMPLE'\n", "aws access key"),
-        ("-----BEGIN OPENSSH PRIVATE KEY-----\n", "private key block"),
-        ("cookie: SESSDATA=abcdef1234567890abcdef;\n", "bilibili session"),
+        # Assembled here on purpose: the tree must stay clean, so a fixture
+        # that is a literal would trip the very check it tests.
+        ("aws = 'AKIA" + "IOSFODNN7EXAMPLE'\n", "aws access key"),
+        ("-----BEGIN " + "OPENSSH PRIVATE KEY-----\n", "private key block"),
+        ("cookie: SESSDATA=" + "abcdef1234567890abcdef;\n", "bilibili session"),
     ],
 )
 def test_other_provider_shapes_are_flagged(tmp_path: Path, body: str, label: str) -> None:

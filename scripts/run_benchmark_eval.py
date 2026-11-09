@@ -128,11 +128,23 @@ def load_queries(path: Path) -> list[Query]:
             Query(
                 query=question,
                 answer=str(row.get("answer") or ""),
-                question_type=str(row.get("question_type") or "untyped"),
+                question_type=_kind(str(row.get("question_type") or "untyped")),
                 evidence=list(row.get("evidence_list") or []),
             )
         )
     return queries
+
+
+def _kind(raw: str) -> str:
+    """Normalize a benchmark question type.
+
+    MultiHop-RAG names its types `comparison_query`, `inference_query`,
+    `temporal_query` and `null_query`; the suffix carries no meaning here, and
+    `null` has to survive normalization because it becomes the unanswerable
+    probe.
+    """
+    cleaned = raw.strip().casefold()
+    return cleaned.removesuffix("_query") or "untyped"
 
 
 def _slug(title: str) -> str:
@@ -202,7 +214,9 @@ def to_seed_questions(queries: list[Query]) -> list[SeedQuestion]:
     """Map benchmark rows onto the repository's seed-question shape."""
     questions = []
     for index, query in enumerate(queries):
-        titles = sorted({str(row.get("source") or "") for row in query.evidence} - {""})
+        titles = sorted(
+            {str(row.get("title") or row.get("source") or "") for row in query.evidence} - {""}
+        )
         phrases = [str(row.get("fact") or "") for row in query.evidence]
         tags = [query.question_type]
         if query.question_type.casefold() == "null":
@@ -508,6 +522,12 @@ def main(argv: list[str] | None = None) -> int:
     from sci_rag.llm import get_llm
 
     settings = get_settings()
+    if settings.is_offline():
+        raise SystemExit(
+            "No generation credential configured. See docs/api-keys.md: set "
+            "SCI_RAG_OPENAI_API_KEY with SCI_RAG_OPENAI_BASE_URL for an "
+            "OpenAI-compatible endpoint, or SCI_RAG_DEEPSEEK_API_KEY."
+        )
     answer_model = str(settings.model_spec_for("answer"))
     judge = get_llm(settings, role="judge")
     judge_model = judge.describe()
