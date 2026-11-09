@@ -1195,6 +1195,10 @@ def eval_answers(
         "--compressed",
         help="Summarize each retrieved source before answering, as a separate condition to compare.",
     ),
+    concurrency: int = typer.Option(
+        1,
+        help="Questions answered at once. Raise it for a remote provider; 1 is serial.",
+    ),
 ) -> None:
     """Answer every seed question and grade each answer for grounding, citations, and correctness.
 
@@ -1227,6 +1231,7 @@ def eval_answers(
             profile=profile,
             limit=limit,
             include_compression=compressed,
+            concurrency=concurrency,
         )
         fingerprint = await corpus_fingerprint(get_session_factory())
         # Stamped into the report: grading answers with the model that wrote
