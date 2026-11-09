@@ -56,6 +56,40 @@ async def test_explicit_identifier_ranks_before_common_question_words(clean_tabl
     assert {key for _, key in hits} == expected
 
 
+async def test_long_english_question_matches_with_or_terms(clean_tables):
+    factory = get_session_factory()
+    expected = set()
+    async with factory() as session:
+        for index, body in enumerate(
+            [
+                "Adjusted EBITDA was $1.7 billion in Q3 2024.",
+                "Gross Bookings grew 18% year over year.",
+                "Unrelated filler about office furniture.",
+            ]
+        ):
+            doc = Document(
+                title=f"English {index}",
+                source="allowed",
+                content_hash=str(index) * 64,
+                license_class="public",
+            )
+            session.add(doc)
+            await session.flush()
+            chunk = Chunk(document_id=doc.id, chunk_index=0, content=body, token_count=15)
+            session.add(chunk)
+            await session.flush()
+            if index < 2:
+                expected.add(chunk.id)
+        await session.commit()
+    query = (
+        "How have Uber's Adjusted EBITDA and its margin as a percentage of "
+        "Gross Bookings trended on a quarterly basis, and what key drivers "
+        "have contributed to these trends?"
+    )
+    hits = await keyword_stage(factory, query, RetrievalScope(license_classes=("public",)), 20)
+    assert expected <= {key for _, key in hits}
+
+
 async def test_browse_scope_buckets_pagination_and_dates(clean_tables):
     from sci_rag.browse import browse_documents, facet_counts
 

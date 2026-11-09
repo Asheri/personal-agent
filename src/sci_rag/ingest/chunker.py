@@ -218,6 +218,68 @@ def _overlap_tail_lines(body: str, overlap_tokens: int) -> str:
     return "\n".join(tail).strip()
 
 
+def _is_pipe_separator(line: str) -> bool:
+    """True for the Markdown separator row of a pipe table."""
+    stripped = line.strip()
+    if "|" not in stripped or "-" not in stripped:
+        return False
+    cells = stripped.strip("|").split("|")
+    return bool(cells) and all(re.fullmatch(r"\s*:?-{3,}:?\s*", cell) for cell in cells)
+
+
+def _split_table_rows(text: str, target_tokens: int) -> list[str]:
+    """Split an oversized table by rows, repeating its header.
+
+    A table is normally kept whole so a row never straddles two chunks. A
+    table larger than the embedding budget is the exception: carrying it
+    whole makes the embedder pad a batch to the table's length. Repeating the
+    header keeps each row group readable, and embeddable, on its own.
+    """
+    lines = text.splitlines()
+    if not lines:
+        return [text]
+    header: list[str] = []
+    rows = lines
+    if len(lines) >= 2 and _is_pipe_separator(lines[1]):
+        header, rows = lines[:2], lines[2:]
+    elif lines[0].count("|") >= 2:
+        header, rows = [lines[0]], lines[1:]
+    if not rows:
+        return [text]
+    header_tokens = count_tokens("\n".join(header))
+    if header_tokens >= target_tokens:
+        return [text]
+    pieces: list[str] = []
+    current: list[str] = []
+    current_tokens = header_tokens
+
+    def flush() -> None:
+        nonlocal current, current_tokens
+        if not current:
+            return
+        pieces.append("\n".join(header + current))
+        current = []
+        current_tokens = header_tokens
+
+    for row in rows:
+        row_tokens = count_tokens(row)
+        if row_tokens > target_tokens - header_tokens:
+            # One row bigger than the budget: split its words as a last
+            # resort, repeating the header on each piece.
+            flush()
+            words = row.split()
+            step = max(1, len(words) * target_tokens // max(1, row_tokens))
+            for start in range(0, len(words), step):
+                pieces.append("\n".join([*header, " ".join(words[start : start + step])]))
+            continue
+        if current and current_tokens + row_tokens > target_tokens:
+            flush()
+        current.append(row)
+        current_tokens += row_tokens
+    flush()
+    return pieces or [text]
+
+
 def _chunk_blocks(
     blocks: list[Block], *, title: str, target_tokens: int, overlap_tokens: int
 ) -> list[ChunkDraft]:
@@ -274,7 +336,8 @@ def _chunk_blocks(
             continue
         if block.kind == "table":
             flush_buffer()
-            finalize(block.text, is_table=True)
+            for piece in _split_table_rows(block.text, target_tokens):
+                finalize(piece, is_table=True)
             continue
         for piece in _split_oversized(block.text, target_tokens):
             piece_tokens = count_tokens(piece)
