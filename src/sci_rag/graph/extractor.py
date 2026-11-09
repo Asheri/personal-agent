@@ -13,13 +13,19 @@ are dropped, never guessed), then upserted:
 Extraction is incremental. Every processed chunk is stamped, so re-running
 ``sci-rag graph extract`` only touches new material, and a failed batch is
 left unstamped for the next run to retry.
+
+Batches run one at a time by default. A caller that pays per token and not per
+second can raise ``concurrency`` to keep several model calls in flight: each
+batch opens its own session and takes the document-write lock only around its
+write phase, so the model calls overlap while the writes still serialize one
+batch at a time. The stored graph does not depend on the setting.
 """
 
 from __future__ import annotations
 
 import asyncio
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -273,7 +279,15 @@ async def extract_graph(
     reprocess_all: bool = False,
     rate_limit_s: float = 0.2,
     max_chunks: int | None = None,
+    concurrency: int = 1,
 ) -> ExtractionStats:
+    """Extract the graph in batches, optionally several batches at a time.
+
+    ``concurrency`` is a throughput and cost decision, not a quality one: the
+    same chunks become the same entities and relationships whatever it is set
+    to. ``rate_limit_s`` paces the serial path only, because once batches
+    overlap there is no "between batches" to pace.
+    """
     from sci_rag.evals.report import domain_digest
 
     stats = ExtractionStats(domain_digest=domain_digest(domain.directory))
@@ -303,19 +317,56 @@ async def extract_graph(
         log.info("graph_extract_nothing_to_do")
         return stats
 
-    for start in range(0, len(pending), batch_size):
-        batch = pending[start : start + batch_size]
+    batch_rate_limit = rate_limit_s if concurrency <= 1 else 0.0
+
+    async def run_one(batch: Sequence[Row[tuple[str, str, str]]]) -> None:
         await _extract_with_recovery(
             batch,
             session_factory,
             llm,
             domain,
             stats,
-            rate_limit_s=rate_limit_s,
+            rate_limit_s=batch_rate_limit,
         )
-        if rate_limit_s and start + batch_size < len(pending):
-            await asyncio.sleep(rate_limit_s)
+
+    await _run_batches(
+        [pending[start : start + batch_size] for start in range(0, len(pending), batch_size)],
+        concurrency=concurrency,
+        run_one=run_one,
+        rate_limit_s=rate_limit_s,
+    )
     return stats
+
+
+async def _run_batches(
+    batches: Sequence[Sequence[Row[tuple[str, str, str]]]],
+    *,
+    concurrency: int,
+    run_one: Callable[[Sequence[Row[tuple[str, str, str]]]], Awaitable[None]],
+    rate_limit_s: float = 0.0,
+) -> None:
+    """Await every batch, at most ``concurrency`` of them at a time.
+
+    The serial path runs batches in the order ingested and keeps the pacing
+    pause, so it stays byte-identical to the behaviour that predates
+    concurrency. The concurrent path starts each batch under its own semaphore
+    slot; a batch that fails is handled by ``run_one`` and never aborts the
+    others, because waiting for the remaining work is the point of the run.
+    """
+    if concurrency <= 1:
+        for index, batch in enumerate(batches):
+            await run_one(batch)
+            if rate_limit_s and index + 1 < len(batches):
+                await asyncio.sleep(rate_limit_s)
+        return
+
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def run_slot(batch: Sequence[Row[tuple[str, str, str]]]) -> None:
+        async with semaphore:
+            await run_one(batch)
+
+    await asyncio.gather(*(run_slot(batch) for batch in batches))
 
 
 def _batch_id(batch: Sequence[Row[tuple[str, str, str]]]) -> str:

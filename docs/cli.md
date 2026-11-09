@@ -189,6 +189,7 @@ $ sci-rag build [OPTIONS] [PATH]
 | `--no-docling` | boolean | false | Skip Docling even if installed (use the pypdf fallback). |
 | `--no-graph` | boolean | false | Stop after ingestion; skip the knowledge graph. |
 | `--batch-size` | integer | 10 | Chunks per graph-extraction model call. |
+| `--concurrency` | integer range | 1 | Graph-extraction batches to keep in flight; 1 processes them in order. |
 
 ## `sci-rag retrieve`
 
@@ -325,7 +326,7 @@ $ sci-rag graph [OPTIONS] COMMAND [ARGS]...
 
 ## `sci-rag graph extract`
 
-Extract concepts and relationships from ingested chunks. Needs LLM provider credentials. Only chunks the extractor has not seen are processed, so re-running after a new ingest picks up just the new documents.
+Extract concepts and relationships from ingested chunks. Needs LLM provider credentials. Only chunks the extractor has not seen are processed, so re-running after a new ingest picks up just the new documents. Batches run one at a time unless --concurrency raises that; the resulting graph is the same either way, so the setting buys wall-clock time, not quality.
 
 ```console
 $ sci-rag graph extract [OPTIONS]
@@ -338,6 +339,7 @@ $ sci-rag graph extract [OPTIONS]
 | `--batch-size` | integer | 10 | Chunks per extraction call. |
 | `--all` | boolean | false | Re-read every chunk, including previously processed chunks. |
 | `--max-chunks` | integer | unset | Stop after this many chunks (for trials). |
+| `--concurrency` | integer range | 1 | Batches to keep in flight; 1 processes them in order. Raise it for a remote provider. |
 
 ## `sci-rag graph reset`
 
@@ -999,6 +1001,7 @@ $ sci-rag eval answers [OPTIONS]
 | `--judge-model` | text | unset | Judge model spec, 'model' or 'provider:model'. Overrides SCI_RAG_JUDGE_MODEL. |
 | `--snapshot` | text | unset | Record this corpus snapshot name in the report. |
 | `--compressed` | boolean | false | Summarize each retrieved source before answering, as a separate condition to compare. |
+| `--concurrency` | integer | 1 | Questions answered at once. Raise it for a remote provider; 1 is serial. |
 
 ## `sci-rag eval diff`
 

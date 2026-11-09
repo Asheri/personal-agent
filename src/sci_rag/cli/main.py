@@ -492,6 +492,11 @@ def build(
         False, "--no-graph", help="Stop after ingestion; skip the knowledge graph."
     ),
     batch_size: int = typer.Option(10, help="Chunks per graph-extraction model call."),
+    concurrency: int = typer.Option(
+        1,
+        min=1,
+        help="Graph-extraction batches to keep in flight; 1 processes them in order.",
+    ),
 ) -> None:
     """Build the knowledge base: reconcile sources, then update the graph and summaries.
 
@@ -523,7 +528,12 @@ def build(
         )
     else:
         console.print("\nBuilding the knowledge graph (one model call per batch of chunks)...")
-        extraction = _run_graph_extract(batch_size=batch_size, reprocess_all=False, max_chunks=None)
+        extraction = _run_graph_extract(
+            batch_size=batch_size,
+            reprocess_all=False,
+            max_chunks=None,
+            concurrency=concurrency,
+        )
         if extraction.batches_failed:
             failed = True
         if getattr(report, "graph_changed", True) or getattr(extraction, "chunks_processed", 0):
@@ -811,7 +821,9 @@ def answer(
     run_async(run())
 
 
-def _run_graph_extract(*, batch_size: int, reprocess_all: bool, max_chunks: int | None):  # type: ignore[no-untyped-def]
+def _run_graph_extract(  # type: ignore[no-untyped-def]
+    *, batch_size: int, reprocess_all: bool, max_chunks: int | None, concurrency: int = 1
+):
     """Run extraction and print its report; shared by `graph extract` and `build`."""
     from sci_rag.config import get_settings
     from sci_rag.db import get_session_factory
@@ -830,6 +842,7 @@ def _run_graph_extract(*, batch_size: int, reprocess_all: bool, max_chunks: int 
             batch_size=batch_size,
             reprocess_all=reprocess_all,
             max_chunks=max_chunks,
+            concurrency=concurrency,
         )
 
     stats_result = run_async(run())
@@ -865,14 +878,24 @@ def graph_extract(
         False, "--all", help="Re-read every chunk, including previously processed chunks."
     ),
     max_chunks: int | None = typer.Option(None, help="Stop after this many chunks (for trials)."),
+    concurrency: int = typer.Option(
+        1,
+        min=1,
+        help="Batches to keep in flight; 1 processes them in order. Raise it for a remote provider.",
+    ),
 ) -> None:
     """Extract concepts and relationships from ingested chunks. Needs LLM provider credentials.
 
     Only chunks the extractor has not seen are processed, so re-running after
-    a new ingest picks up just the new documents.
+    a new ingest picks up just the new documents. Batches run one at a time
+    unless --concurrency raises that; the resulting graph is the same either
+    way, so the setting buys wall-clock time, not quality.
     """
     stats_result = _run_graph_extract(
-        batch_size=batch_size, reprocess_all=reprocess_all, max_chunks=max_chunks
+        batch_size=batch_size,
+        reprocess_all=reprocess_all,
+        max_chunks=max_chunks,
+        concurrency=concurrency,
     )
     if stats_result.batches_failed:
         raise typer.Exit(1)
