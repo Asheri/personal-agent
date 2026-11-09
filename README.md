@@ -203,10 +203,15 @@ environment setup and the scheduling integration differ.
 | Dependencies | `uv sync` | `uv sync` |
 | Database | `make db-up`, or `docker compose up -d` | `docker compose up -d` (a default shell has no `make`) |
 | Config file | `cp .env.example .env` then `chmod 600 .env` | The `icacls` sequence above |
-| Demo | `make demo` | `uv run sci-rag build data/demo/fixture` |
+| Demo | `make demo` | The `demo` target in [Makefile](Makefile), run by hand |
 
-Every `make` target is a thin wrapper over `uv run`. On a host without `make`,
-read the target in [Makefile](Makefile) and run the same command by hand.
+Every `make` target is a thin wrapper over one command. On a host without
+`make`, read the target in [Makefile](Makefile) and run that command with your
+activated environment, for example:
+
+```bash
+uv run sci-rag build data/demo/fixture
+```
 [Configure Postgres backend](docs/run-postgres.md) covers Docker, a system
 server, Postgres.app, and Cloud SQL.
 

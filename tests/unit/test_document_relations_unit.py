@@ -1,7 +1,9 @@
 """Unit checks for geometry and explicit references without models or services."""
 
 import math
+import os
 from array import array
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -37,9 +39,10 @@ def test_only_explicit_links_and_dois_become_mention_candidates():
 
 
 def test_relative_links_resolve_before_ambiguous_basenames():
-    source = Document(id="source", title="Source", extra={"path": r"d:\records\one\source.md"})
-    one = Document(id="one", title="Repeated", extra={"path": r"d:\records\one\target.md"})
-    two = Document(id="two", title="Repeated", extra={"path": r"d:\records\two\target.md"})
+    base = Path("d:/records") if os.name == "nt" else Path("/records")
+    source = Document(id="source", title="Source", extra={"path": str(base / "one" / "source.md")})
+    one = Document(id="one", title="Repeated", extra={"path": str(base / "one" / "target.md")})
+    two = Document(id="two", title="Repeated", extra={"path": str(base / "two" / "target.md")})
     assert resolve_key("target.md", source, [one, two]) == ("one", False)
     assert resolve_key("Repeated", source, [one, two]) == (None, True)
 
