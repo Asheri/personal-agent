@@ -68,7 +68,7 @@ async def snapshot() -> dict:
 def run(args: argparse.Namespace) -> None:
     kb = Path(__file__).resolve().parents[1]
     args.output.mkdir(parents=True, exist_ok=True)
-    provenance = prepare(args.agent)
+    provenance = prepare(args.agent, ref=args.ref)
     save(args.output / "upstream-provenance.json", provenance)
     args.corpus.mkdir(parents=True, exist_ok=True)
     manifest = args.corpus / "corpus.jsonl"
@@ -102,9 +102,15 @@ def run(args: argparse.Namespace) -> None:
     )
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
-    def refresh(channel):
-        result = subprocess.run(
-            [
+    def refresh_command(channel: str) -> list[str]:
+        """The launcher the installed integration would run for this channel.
+
+        Windows runs the generated PowerShell wrapper. macOS and Linux run the
+        same one-shot refresh directly, because this project only ships a
+        Windows scheduler today and the channel contract is the CLI call.
+        """
+        if os.name == "nt":
+            return [
                 "powershell.exe",
                 "-NoProfile",
                 "-ExecutionPolicy",
@@ -113,7 +119,23 @@ def run(args: argparse.Namespace) -> None:
                 str(args.agent / "pcmem-refresh.ps1"),
                 "-Channel",
                 channel,
-            ],
+            ]
+        return [
+            sys.executable,
+            "-c",
+            "from sci_rag.cli.main import app; app()",
+            "refresh",
+            "run",
+            str(args.corpus),
+            "--channel",
+            channel,
+            "--manifest",
+            str(manifest),
+        ]
+
+    def refresh(channel):
+        result = subprocess.run(
+            refresh_command(channel),
             capture_output=True,
             text=True,
             timeout=120,
@@ -179,7 +201,7 @@ def run(args: argparse.Namespace) -> None:
     spec.loader.exec_module(scheduler)
     try:
         prompt = scheduler.check()
-        assert prompt and "pcmem-refresh.ps1" in prompt and "ask_user" in prompt
+        assert prompt and "pcmem-refresh" in prompt and "ask_user" in prompt
         refresh("scheduler")
     finally:
         scheduler._lock.close()
@@ -242,4 +264,9 @@ if __name__ == "__main__":
     parser.add_argument("--agent", type=Path, required=True)
     parser.add_argument("--corpus", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument(
+        "--ref",
+        default=None,
+        help="GenericAgent branch or tag to fetch the fixture from (default main)",
+    )
     run(parser.parse_args())

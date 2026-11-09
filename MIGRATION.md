@@ -160,11 +160,20 @@ had no way to check either.
   and `ocr` extras, the `modelscope-embedding` extra, and the PC-Mem modules).
   The copy therefore follows no later upstream commit.
 - **GenericAgent commit `a9a36b4b219593369de01c3e5973e56ac02a568b` does not
-  resolve** in the public repository as of 2026-11-09, and no license file
-  exists in the history reachable today, although GitHub reports MIT for the
-  repository. The vendored files are pinned by git blob SHA-1 instead, and the
-  MIT text is reproduced, in `THIRD-PARTY-NOTICES.md`. Confirm the grant with
-  upstream before redistributing this work under another name.
+  resolve** in the public repository as of 2026-11-09, so the recorded snapshot
+  cannot be inspected. The project publishes MIT (`Copyright (c) 2025
+  lsdefine`) at `main` today.
+- **The fixture pins a blob, not a commit.** `scripts/prepare_agent_fixture.py`
+  now fetches from a ref that exists (`main` by default) and checks
+  `plugins/hooks.py` against its archived git blob
+  `655fa3773fe39f0d9bfceeeceebd1db863832dc1`, which was still identical at
+  `main` on 2026-11-09. That file is the one API this project imports, so a
+  mismatch must fail loudly. The other five files are reported as `drifted`
+  and still written, because the acceptance run only imports or hashes them.
+- **No vendoring.** `docs/agent-integration.md` records the full contract:
+  seven installed files, six hashed seeds, three ways to obtain the fixture,
+  and which evaluations need GenericAgent at all (only the protocol
+  acceptance does).
 - **Reader-facing provenance** lives in `README.md` section "What comes from
   where" and in `README_ZH.md` section "来源声明". Those two tables are the
   public copy of this ledger; keep them in step when a part changes status.
