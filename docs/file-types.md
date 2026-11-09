@@ -27,12 +27,14 @@ legacy Office files to the supported OOXML format before ingestion.
 Install Python dependencies with `uv sync --extra office --extra ocr-tesseract`.
 The OCR extra contains Pillow and pypdfium2; it does not install a native
 Tesseract executable or its language data. The `ocr` extra is an equivalent alias.
-Install the native runtime and `chi_sim`/`eng` data separately, keeping local
-artifacts under `D:/Codex` in this handoff environment. Configure:
+Install the native runtime and `chi_sim`/`eng` data separately. Point both
+settings at your own installation; the example below is a Homebrew tree on
+macOS, and a Windows portable runtime under `PCMEM_DATA_DIR` works the same
+way (`Library/bin/tesseract.exe` and `share/tessdata`).
 
 ```text
-SCI_RAG_OCR_TESSERACT_CMD=D:/Codex/ocr/Library/bin/tesseract.exe
-SCI_RAG_OCR_TESSDATA_DIR=D:/Codex/ocr/share/tessdata
+SCI_RAG_OCR_TESSERACT_CMD=/opt/homebrew/bin/tesseract
+SCI_RAG_OCR_TESSDATA_DIR=/opt/homebrew/share/tessdata
 SCI_RAG_OCR_LANGUAGES=chi_sim+eng
 ```
 
@@ -41,7 +43,8 @@ OCR uses a local subprocess with a 60-second per-page timeout. Missing runtimes,
 language data, failed engines, and empty recognition return explicit failures.
 No OCR download or network request happens during parsing.
 
-Use `sci-rag ingest D:/Codex/corpus --no-docling`, or an explicit JSONL manifest.
+Use `sci-rag ingest "$PCMEM_DATA_DIR/corpus" --no-docling`, or an explicit JSONL
+manifest.
 Ordinary folder inputs keep `license_class=unknown`; installing parsers grants
 no permission to send their contents to an external model.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -19,14 +20,30 @@ FILES = {
 }
 
 
+def data_root() -> Path:
+    """The one directory this tool may write under.
+
+    The handoff machine used a fixed `D:/Codex`. Any absolute root works now;
+    set `PCMEM_DATA_DIR` to keep large downloads off the system drive. Without
+    it, the root is `pcmem-data` in the home directory.
+    """
+    configured = os.environ.get("PCMEM_DATA_DIR")
+    return (
+        Path(configured).expanduser().resolve()
+        if configured
+        else (Path.home() / "pcmem-data").resolve()
+    )
+
+
 def blob(data: bytes) -> str:
     return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
 
 
 def prepare(directory: Path) -> dict:
     directory = directory.resolve()
-    if not directory.is_relative_to(Path("D:/Codex").resolve()):
-        raise ValueError("Keep fixtures under D:/Codex")
+    root = data_root()
+    if not directory.is_relative_to(root):
+        raise ValueError(f"Keep fixtures under {root}; set PCMEM_DATA_DIR to change it")
     manifest = {}
     for name, expected in FILES.items():
         target = directory / name

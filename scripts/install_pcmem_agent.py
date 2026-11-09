@@ -5,11 +5,27 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
+
+
+def data_root() -> Path:
+    """The one directory this tool may write under.
+
+    The handoff machine used a fixed `D:/Codex`. Any absolute root works now;
+    set `PCMEM_DATA_DIR` to keep large downloads off the system drive. Without
+    it, the root is `pcmem-data` in the home directory.
+    """
+    configured = os.environ.get("PCMEM_DATA_DIR")
+    return (
+        Path(configured).expanduser().resolve()
+        if configured
+        else (Path.home() / "pcmem-data").resolve()
+    )
 
 
 def digest(path: Path) -> str:
@@ -24,10 +40,11 @@ def install(
     agent: Path, kb: Path, corpus: Path, python: Path, manifest: Path | None = None
 ) -> dict:
     agent, kb, corpus, python = [path.resolve() for path in [agent, kb, corpus, python]]
-    if any(
-        not path.is_relative_to(Path("D:/Codex").resolve()) for path in [agent, kb, corpus, python]
-    ):
-        raise ValueError("This handoff keeps all installation and corpus paths under D:/Codex")
+    root = data_root()
+    if any(not path.is_relative_to(root) for path in [agent, kb, corpus, python]):
+        raise ValueError(
+            f"Keep the installation and corpus paths under {root}; set PCMEM_DATA_DIR to change it"
+        )
     seeds = [
         "agent_loop.py",
         "ga.py",

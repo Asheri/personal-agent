@@ -28,11 +28,19 @@ PC-Mem 把个人电脑里散落的文件整理成 Agent 能长期记住的知识
 | 步骤 | macOS 与 Linux | Windows |
 |---|---|---|
 | 依赖 | `uv sync` | `uv sync` |
-| 数据库 | `make db-up`，或 `docker compose up -d` | `docker compose up -d`（默认 shell 没有 `make`） |
+| 数据库 | `make db-up`，或 `docker compose up -d` | 用下面的 `db-up` 任务 |
 | 配置文件 | `cp .env.example .env` 后 `chmod 600 .env` | 用英文 README 里那段 `icacls` 序列 |
-| 演示 | `make demo` | `uv run sci-rag build data/demo/fixture` |
+| 演示 | `make demo` | 用 `demo` 任务 |
 
-每个 `make` 目标都只是 `uv run` 的包装。没有 `make` 的机器上，打开 [`Makefile`](Makefile) 读那一行，照着敲同样的命令。数据库可以用 Docker、系统安装的 PostgreSQL、macOS 上的 Postgres.app，或 Cloud SQL，见 [`docs/run-postgres.md`](docs/run-postgres.md)。
+Windows 默认没有 `make`，所以每个日常目标都另有一个跨平台任务入口，两者执行完全相同的命令：
+
+```bash
+make db-up                            # macOS 与 Linux
+uv run python scripts/tasks.py db-up  # 三个平台
+uv run python scripts/tasks.py --list # 列出全部任务
+```
+
+`docs`、`benchmark`、`benchmark-check`、`benchmark-refresh-graph` 四个目标在 Makefile 里是 POSIX shell 管道，仍留在 Makefile；任务入口会明确拒绝并提示改用 `make`。数据库可以用 Docker、系统安装的 PostgreSQL、macOS 上的 Postgres.app，或 Cloud SQL，见 [`docs/run-postgres.md`](docs/run-postgres.md)。
 
 跑通个人域而不是演示域：
 

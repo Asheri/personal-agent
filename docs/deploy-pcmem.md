@@ -6,7 +6,8 @@ Use explicit corpus paths and a reviewed manifest before enabling real automatio
 
 ## Prepare the local runtime
 
-Keep this environment under `D:/Codex`. Install this project's locked dependencies
+Keep this environment under the root named by `PCMEM_DATA_DIR`, which defaults to
+`pcmem-data` in your home directory. Install this project's locked dependencies
 and chosen embedding/generation provider. Configure credentials locally without
 putting them in source, logs, or the handoff archive. For offline checks use
 `SCI_RAG_EMBEDDING_PROVIDER=local-hash` and a matching database vector dimension.
@@ -19,14 +20,16 @@ restores the earlier Chinese-only token cache and drops access/date columns.
 Reverting 0013 removes its event history. Export/back up those records first.
 
 ```powershell
+$root = $env:PCMEM_DATA_DIR
 python scripts/install_pcmem_agent.py `
-  --agent-root D:/Codex/GenericAgent `
-  --corpus-root D:/Codex/my-corpus `
-  --manifest D:/Codex/my-corpus/corpus.jsonl `
-  --python D:/Codex/python/.venv/Scripts/python.exe
+  --agent-root "$root/GenericAgent" `
+  --corpus-root "$root/my-corpus" `
+  --manifest "$root/my-corpus/corpus.jsonl" `
+  --python "$root/python/.venv/Scripts/python.exe"
 ```
 
-The installer requires a real existing checkout and explicit D-drive paths. It
+The installer requires a real existing checkout and explicit paths under the data
+root. It
 refuses different preexisting integration files, supports identical reinstallation,
 and records before/after seed hashes. It does not copy credentials or change
 `agent_loop.py`, `ga.py`, `agentmain.py`, `llmcore.py`, hooks, or scheduler seeds.
@@ -51,12 +54,12 @@ interactive task repeating every 15 minutes. Register it only for the intended
 deployment user:
 
 ```powershell
-schtasks /Create /TN PCMemPoll /XML D:/Codex/GenericAgent/pcmem-poll-task.xml
+schtasks /Create /TN PCMemPoll /XML $root/GenericAgent/pcmem-poll-task.xml
 ```
 
 The installer and acceptance run do not register a permanent OS task. Test the
 exact polling entry point directly with
-`powershell -NoProfile -File D:/Codex/GenericAgent/pcmem-refresh.ps1 -Channel poll`.
+`powershell -NoProfile -File $root/GenericAgent/pcmem-refresh.ps1 -Channel poll`.
 Its exit code is propagated unchanged. All channels use one database lock, so
 overlapping invocations return busy without creating competing writers.
 

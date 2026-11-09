@@ -201,17 +201,21 @@ environment setup and the scheduling integration differ.
 | Step | macOS and Linux | Windows |
 |---|---|---|
 | Dependencies | `uv sync` | `uv sync` |
-| Database | `make db-up`, or `docker compose up -d` | `docker compose up -d` (a default shell has no `make`) |
+| Database | `make db-up`, or `docker compose up -d` | The `db-up` task (see below) |
 | Config file | `cp .env.example .env` then `chmod 600 .env` | The `icacls` sequence above |
-| Demo | `make demo` | The `demo` target in [Makefile](Makefile), run by hand |
+| Demo | `make demo` | The `demo` task |
 
-Every `make` target is a thin wrapper over one command. On a host without
-`make`, read the target in [Makefile](Makefile) and run that command with your
-activated environment, for example:
+`make` is not installed by default on Windows, so every target a developer runs
+day to day also exists as a task. The two run the same commands:
 
 ```bash
-uv run sci-rag build data/demo/fixture
+make db-up          # macOS and Linux
+uv run python scripts/tasks.py db-up   # any platform
+uv run python scripts/tasks.py --list  # every task, one line each
 ```
+
+The four targets whose Makefile body is a POSIX shell pipeline stay there: the
+task runner names them and exits rather than half-running them.
 [Configure Postgres backend](docs/run-postgres.md) covers Docker, a system
 server, Postgres.app, and Cloud SQL.
 
