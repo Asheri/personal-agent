@@ -126,6 +126,43 @@ minute, not the GPU.
 The GPU column excludes extraction, which is the bigger half on a small corpus:
 0.39 GPU-hours for MultiHop-RAG, against 0.79 for every answer and judge call.
 
+## Building the graph is the expensive half, measured
+
+A 20-article smoke run on MultiHop-RAG (71 chunks, one disposable database),
+with the shipped `domain-personal` ontology and Qwen3-30B-A3B-Instruct:
+
+| Measure | Result |
+|---|---|
+| Extraction calls that completed in 30 minutes before the timeout | 9 |
+| Prompt tokens | 29,364 |
+| Completion tokens | 55,959 |
+| Output to input ratio | 1.9 |
+| Written before the timeout | 86 entities, 64 relationships |
+
+The failure mode is not the provider: it is output length. One batch of ten news
+chunks asks the model for hundreds of entity and relationship objects, so it
+emits about 6,200 completion tokens, hits the 8,192-token ceiling, and comes
+back as truncated JSON. The extractor detects that, splits the batch, and tries
+again, which is the right behavior and also why the wall clock goes to tens of
+seconds per call instead of the provider's token budget.
+
+Two consequences for anyone planning a larger run:
+
+- **Decode time dominates.** At roughly 40 tokens/s per single-stream call,
+  a 1.9 output-to-input ratio means the graph costs hours whatever the token
+  ceiling is. Parallel extraction, or a smaller batch that never truncates, is
+  the fix, and neither is wired up today.
+- **The domain profile has to match the corpus.** The same 20 articles through
+  the shipped `domain/` agricultural ontology produced almost nothing: the model
+  obeyed "use ONLY these entity types" and news names fit none of them. Point
+  `SCI_RAG_DOMAIN_DIR` at a profile whose types cover the corpus before
+  concluding that extraction is weak.
+
+Practical reading: on this pipeline, a benchmark-wide graph is a research task,
+not a configuration change. Run `plain` against `rag` on the public benchmark,
+and make the graph claim on a personal corpus where documents are small and the
+ontology fits.
+
 ## Local embedding, measured
 
 Qwen3-Embedding-0.6B on an M5 Pro through MPS, 1,024 dimensions:
