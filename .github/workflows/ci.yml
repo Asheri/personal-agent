@@ -47,6 +47,8 @@ jobs:
         # The provider extras are light and carry the LLM adapters' tests, so
         # CI installs them rather than skipping that coverage.
         run: uv sync --extra anthropic --extra openai
+      - name: No credential-shaped strings in the tree
+        run: uv run python scripts/check_no_secrets.py
       - name: Lint
         run: |
           uv run ruff check src tests examples scripts

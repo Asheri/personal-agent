@@ -21,3 +21,12 @@ repos:
       - id: check-added-large-files
         args: [--maxkb=600]
       - id: check-merge-conflict
+  - repo: local
+    hooks:
+      # A key in a commit survives every later edit of that file. This hook is
+      # the only thing between a copied .env and a public pull request.
+      - id: no-secrets
+        name: no credential-shaped strings
+        entry: uv run python scripts/check_no_secrets.py --staged
+        language: system
+        pass_filenames: false
