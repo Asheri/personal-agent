@@ -14,7 +14,13 @@ unassigned review template in `docs/superpowers/specs/`.
 | `pytest tests/unit -q` as delivered | Windows, no database | 1,736 collected: 1,690 passed, 7 failed, 39 skipped | `.context/core-completion-20261026/unit-release.xml` |
 | the same suite in a git checkout | macOS, Python 3.12 | 1,735 passed, 13 skipped, 0 failed | re-run on this branch, 2026-11-09 |
 | `pytest tests/integration tests/server -q` | Windows, throwaway PostgreSQL 16 with pgvector | 279 passed, 0 failed, 0 skipped | `.context/core-completion-20261026/integration-release.xml` |
+| the same integration and server suite | macOS, PostgreSQL 17 with pgvector 0.8.7 | 279 passed, 0 failed | re-run on this branch, 2026-11-09 |
 | `pytest tests/docs -q` | Windows, no site build | 34 collected: 20 passed, 14 skipped | `.context/core-completion-20261026/docs-final.xml` |
+
+One more Windows assumption lived in the integration fixtures: relative links
+are resolved only when the source path is absolute by the host's own rules, and
+a literal `d:\records\...` is not absolute on POSIX. Those fixtures now build
+their paths from a platform-appropriate base.
 
 The seven failures in the delivered tree were **not** product defects. Each one
 calls `git ls-files`, `git check-ignore`, or `git diff HEAD`, and the handoff

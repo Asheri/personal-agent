@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import os
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -16,6 +18,12 @@ from sci_rag.retrieve import RetrievalScope
 from sci_rag.server.service import RagService
 
 pytestmark = pytest.mark.integration
+
+# `resolve_key` treats a relative link as relative to the source document, and
+# only when that source path is absolute by the host's own rules. A literal
+# `d:\records\...` is not absolute on POSIX, so the fixtures build their paths
+# from a platform-appropriate base.
+RECORDS = Path("d:/records") if os.name == "nt" else Path("/records")
 
 
 async def _add(
@@ -36,7 +44,7 @@ async def _add(
         source=source,
         license_class="public",
         content_hash=hashlib.sha256(marker.encode()).hexdigest(),
-        extra={"path": path or f"d:\\records\\{marker}.md", **(extra or {})},
+        extra={"path": path or str(RECORDS / f"{marker}.md"), **(extra or {})},
         doi=doi,
         project_id=project,
         project_source="manual" if project else None,
@@ -121,10 +129,10 @@ async def test_mentions_are_auditable_idempotent_and_resolve_later_targets(clean
         source, chunk = await _add(
             session,
             "Source",
-            path=r"d:\records\source.md",
+            path=str(RECORDS / "source.md"),
             content="引用 [[目标计划]] 与 [资料](target.md),还有 [[重复标题]] 和 [[稍后资料]]。",
         )
-        target, _ = await _add(session, "目标计划", path=r"d:\records\target.md")
+        target, _ = await _add(session, "目标计划", path=str(RECORDS / "target.md"))
         await _add(session, "重复标题")
         await _add(session, "重复标题")
         await session.commit()
