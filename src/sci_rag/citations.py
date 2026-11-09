@@ -10,6 +10,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from sci_rag.db.models import Document, DocumentCitation
+from sci_rag.versions import lock_document_writes
 
 _DOI_RE = re.compile(r"^10\.\d{4,9}/\S+$", re.IGNORECASE)
 _DOI_PREFIX_RE = re.compile(r"^(?:doi\s*:\s*|https?://(?:dx\.)?doi\.org/)", re.IGNORECASE)
@@ -63,8 +64,15 @@ async def build_citation_edges(
     Rebuilding later resolves that row when the cited work enters the corpus.
     """
     async with session_factory() as session:
+        await lock_document_writes(session)
         documents = list(
-            (await session.execute(select(Document).order_by(Document.id))).scalars().all()
+            (
+                await session.execute(
+                    select(Document).where(Document.is_current.is_(True)).order_by(Document.id)
+                )
+            )
+            .scalars()
+            .all()
         )
         doi_to_ids: dict[str, list[str]] = {}
         for document in documents:
@@ -118,6 +126,23 @@ async def build_citation_edges(
             key not in existing_by_key or existing_by_key[key].cited_document_id != target_id
             for key, target_id in desired.items()
         )
+        mentions = list(
+            (
+                await session.scalars(
+                    select(DocumentCitation).where(DocumentCitation.source == "mention")
+                )
+            ).all()
+        )
+        superseded_mentions = {
+            m.id
+            for m in mentions
+            for key, target_id in desired.items()
+            if m.citing_document_id == key[0]
+            and (
+                m.cited_doi == key[1]
+                or (target_id is not None and m.cited_document_id == target_id)
+            )
+        }
         report = CitationBuildReport(
             documents_scanned=scanned,
             references_found=references_found,
@@ -125,7 +150,7 @@ async def build_citation_edges(
             unmatched=unmatched,
             self_citations_skipped=self_skipped,
             rows_written=writes,
-            rows_removed=len(stale),
+            rows_removed=len(stale) + len(superseded_mentions),
             dry_run=dry_run,
         )
         if dry_run:
@@ -137,6 +162,19 @@ async def build_citation_edges(
             )
         for key, target_id in desired.items():
             row = existing_by_key.get(key)
+            duplicates = [
+                m
+                for m in mentions
+                if m.citing_document_id == key[0]
+                and (
+                    m.cited_doi == key[1]
+                    or (target_id is not None and m.cited_document_id == target_id)
+                )
+            ]
+            for duplicate in duplicates:
+                await session.delete(duplicate)
+                mentions.remove(duplicate)
+            await session.flush()
             if row is None:
                 session.add(
                     DocumentCitation(

@@ -8,6 +8,7 @@ are recorded, never fatal, so one flaky call cannot torch an hour-long run.
 
 from __future__ import annotations
 
+import asyncio
 import statistics
 from dataclasses import dataclass
 
@@ -54,60 +55,110 @@ async def run_answer_eval(
     limit: int = 8,
     scope: RetrievalScope | None = None,
     include_compression: bool | None = None,
+    concurrency: int = 1,
 ) -> list[AnswerEvalRecord]:
-    records: list[AnswerEvalRecord] = []
-    for question in questions:
-        record = AnswerEvalRecord(question_id=question.id, tags=question.tags)
-        records.append(record)
-        try:
-            result = await engine.answer(
-                question.question,
+    """Answer and grade every question, in order, optionally in flight.
+
+    ``concurrency`` bounds how many questions are being answered at once. The
+    default keeps the historical serial behavior. A remote provider bills and
+    rate-limits per minute, so at one request in flight the wall clock is
+    latency times questions and the minute budget goes unused; the benchmark
+    runner raises this after checking the provider's TPM.
+
+    Records come back in input order either way. One question's failure stays
+    that question's failure: it is recorded, never raised.
+    """
+    if concurrency <= 1:
+        return [
+            await _answer_and_grade(
+                engine,
+                judge_llm,
+                question,
                 profile=profile,
                 limit=limit,
                 scope=scope,
                 include_compression=include_compression,
             )
-        except Exception as exc:
-            record.error = f"answer failed: {type(exc).__name__}: {exc}"
-            log.warning("answer_eval_generation_failed", question=question.id)
-            continue
-        record.answer_text = result.text
-        record.source_count = len(result.sources)
-        record.cited_count = len(result.cited_sources)
-        record.prompt_tokens_before = result.prompt_tokens_before
-        record.prompt_tokens_after = result.prompt_tokens_after
-        record.compression_failure_count = result.compression_failure_count
-        record.compression_dropped_count = result.compression_dropped_count
-        record.degraded_stages = result.retrieval.degraded_stages
-        prompt_retrieval = result.prompt_retrieval or result.retrieval
+            for question in questions
+        ]
 
+    limiter = asyncio.Semaphore(concurrency)
+
+    async def bounded(question: SeedQuestion) -> AnswerEvalRecord:
+        async with limiter:
+            return await _answer_and_grade(
+                engine,
+                judge_llm,
+                question,
+                profile=profile,
+                limit=limit,
+                scope=scope,
+                include_compression=include_compression,
+            )
+
+    return list(await asyncio.gather(*(bounded(question) for question in questions)))
+
+
+async def _answer_and_grade(
+    engine: AnswerEngine,
+    judge_llm: LLMClient,
+    question: SeedQuestion,
+    *,
+    profile: str,
+    limit: int,
+    scope: RetrievalScope | None,
+    include_compression: bool | None,
+) -> AnswerEvalRecord:
+    record = AnswerEvalRecord(question_id=question.id, tags=question.tags)
+    try:
+        result = await engine.answer(
+            question.question,
+            profile=profile,
+            limit=limit,
+            scope=scope,
+            include_compression=include_compression,
+        )
+    except Exception as exc:
+        record.error = f"answer failed: {type(exc).__name__}: {exc}"
+        log.warning("answer_eval_generation_failed", question=question.id)
+        return record
+    record.answer_text = result.text
+    record.source_count = len(result.sources)
+    record.cited_count = len(result.cited_sources)
+    record.prompt_tokens_before = result.prompt_tokens_before
+    record.prompt_tokens_after = result.prompt_tokens_after
+    record.compression_failure_count = result.compression_failure_count
+    record.compression_dropped_count = result.compression_dropped_count
+    record.degraded_stages = result.retrieval.degraded_stages
+    prompt_retrieval = result.prompt_retrieval or result.retrieval
+
+    try:
+        record.grounding = await grade_grounding(
+            judge_llm,
+            engine.domain,
+            question=question.question,
+            answer_text=result.text,
+            sources_block=format_sources(prompt_retrieval)
+            if prompt_retrieval.items
+            else "(no sources were retrieved)",
+        )
+    except Exception as exc:
+        record.error = f"grounding judge failed: {type(exc).__name__}: {exc}"
+        log.warning("answer_eval_grounding_failed", question=question.id)
+
+    if question.reference_answer:
         try:
-            record.grounding = await grade_grounding(
+            record.correctness = await grade_correctness(
                 judge_llm,
                 engine.domain,
                 question=question.question,
+                reference_answer=question.reference_answer,
                 answer_text=result.text,
-                sources_block=format_sources(prompt_retrieval)
-                if prompt_retrieval.items
-                else "(no sources were retrieved)",
             )
         except Exception as exc:
-            record.error = f"grounding judge failed: {type(exc).__name__}: {exc}"
-            log.warning("answer_eval_grounding_failed", question=question.id)
-
-        if question.reference_answer:
-            try:
-                record.correctness = await grade_correctness(
-                    judge_llm,
-                    engine.domain,
-                    question=question.question,
-                    reference_answer=question.reference_answer,
-                    answer_text=result.text,
-                )
-            except Exception as exc:
-                record.error = f"correctness judge failed: {type(exc).__name__}: {exc}"
-                log.warning("answer_eval_correctness_failed", question=question.id)
-    return records
+            record.error = f"correctness judge failed: {type(exc).__name__}: {exc}"
+            log.warning("answer_eval_correctness_failed", question=question.id)
+    return record
 
 
 def summarize_answer_records(records: list[AnswerEvalRecord]) -> dict[str, float]:

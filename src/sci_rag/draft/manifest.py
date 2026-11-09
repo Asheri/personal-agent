@@ -25,6 +25,7 @@ from pydantic import ValidationError
 
 from sci_rag.draft import DraftError, complete, parse_json_object
 from sci_rag.draft import render_prompt as _render_template
+from sci_rag.draft.sampling import DRAFT_SUFFIXES
 from sci_rag.ingest.manifest import CorpusEntry
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -97,7 +98,9 @@ def read_heads(folder: Path, *, max_chars: int = HEAD_CHARS) -> list[DocumentHea
 
     if not folder.exists():
         raise DraftError(f"The folder {folder} does not exist.")
-    discovered = discover_folder(folder)
+    discovered = [
+        entry for entry in discover_folder(folder) if entry.path.suffix.lower() in DRAFT_SUFFIXES
+    ]
     if not discovered:
         raise DraftError(f"Found no supported documents under {folder}.")
 

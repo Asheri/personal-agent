@@ -310,11 +310,24 @@ class Retriever:
 
         if not rerank_on:
             traces.append(StageTrace(stage="rerank", status="disabled"))
+            await self._record_access(items[:limit])
             return RetrievalResult(items=items[:limit], traces=traces, profile=profile)
 
         items, rerank_trace = await self._rerank(query, items, limit, rerank_cfg)
         traces.append(rerank_trace)
+        await self._record_access(items)
         return RetrievalResult(items=items, traces=traces, profile=profile)
+
+    async def _record_access(self, items: list[RetrievedItem]) -> None:
+        from sci_rag.memory_state import record_access
+
+        try:
+            await record_access(
+                self.session_factory, [item.document_id for item in items if item.document_id]
+            )
+        except Exception as exc:
+            # Read-only hosts still serve evidence; telemetry failure is explicit.
+            log.warning("memory_access_unavailable", error=type(exc).__name__)
 
     async def _rerank(
         self,
@@ -399,6 +412,7 @@ class Retriever:
                         Document.formatted_citation,
                         Document.license_class,
                         Document.source,
+                        Document.is_current,
                     )
                     .join(Document, Chunk.document_id == Document.id)
                     # Scope was applied inside every stage; re-applying here is
@@ -412,7 +426,9 @@ class Retriever:
                         score=0.0,
                         layers=[],
                         title=row.title,
-                        content=row.content,
+                        content=row.content
+                        if getattr(row, "is_current", True)
+                        else "[已过期, 可能仍反映历史工作]\n" + row.content,
                         document_id=row.document_id,
                         section_path=row.section_path,
                         citation=row.formatted_citation,

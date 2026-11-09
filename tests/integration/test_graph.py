@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from collections.abc import AsyncIterator
@@ -91,7 +92,19 @@ class ScriptedLLM(LLMClient):
         self, prompt, *, system=None, temperature=0.2, max_tokens=2048, json_mode=False
     ):  # type: ignore[no-untyped-def]
         if "knowledge graph for this domain" in prompt:
-            return json.dumps(self.extraction)
+            payload = deepcopy(self.extraction)
+            # Attribute the fixture to its actual numbered source, not a hash order.
+            starts = list(re.finditer(r"(?m)^(\d+)\. ", prompt))
+            for index, match in enumerate(starts):
+                end = starts[index + 1].start() if index + 1 < len(starts) else len(prompt)
+                if "produced in Colusa County" in prompt[match.end() : end]:
+                    passage = int(match.group(1))
+                    for entity in payload["entities"]:
+                        entity["passages"] = [passage]
+                    for edge in payload["relationships"]:
+                        edge["passage"] = passage
+                    break
+            return json.dumps(payload)
         if '"entities"' in prompt:
             names = ", ".join(f'"{e}"' for e in self.query_entities)
             return f'{{"entities": [{names}]}}'
@@ -109,7 +122,9 @@ def corpus(tmp_path: Path) -> list[CorpusEntry]:
     rice = tmp_path / "rice.md"
     rice.write_text(
         "# Rice Straw in Colusa County\n\nRice straw is produced in Colusa County after "
-        "harvest and can be digested to biogas through anaerobic digestion."
+        "harvest and can be digested to biogas through anaerobic digestion. "
+        "Rice straw is also called paddy straw or rice residue. "
+        "Anaerobic digestion yields biogas, and biogas production creates demand for straw."
     )
     almond = tmp_path / "almond.md"
     almond.write_text(

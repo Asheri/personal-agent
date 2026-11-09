@@ -33,7 +33,21 @@ from .compress import SnippetCompressor
 
 log = structlog.get_logger(__name__)
 
-_CITATION_RE = re.compile(r"\[(\d+)\]")
+_CITATION_RE = re.compile(r"\[(\d{1,6}(?:\s*(?:,|-)\s*\d{1,6})*)\]")
+
+
+def _citation_indices(value: str, available: set[int]) -> set[int]:
+    """Read common model citation lists without expanding unbounded ranges."""
+    cited: set[int] = set()
+    for group in _CITATION_RE.findall(value):
+        for part in group.split(","):
+            bounds = [int(v.strip()) for v in part.split("-")]
+            if len(bounds) == 1:
+                if bounds[0] in available:
+                    cited.add(bounds[0])
+            else:
+                cited.update(i for i in available if bounds[0] <= i <= bounds[1])
+    return cited
 
 
 @dataclass
@@ -318,7 +332,7 @@ class AnswerEngine:
             return
 
         text = "".join(collected)
-        cited_indices = {int(m) for m in _CITATION_RE.findall(text)}
+        cited_indices = _citation_indices(text, {source.index for source in sources})
         for source in sources:
             source.cited = source.index in cited_indices
         yield AnswerEvent(

@@ -28,6 +28,9 @@ from sci_rag.draft import DraftError
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+# Drafting keeps its existing text formats when optional ingestion formats grow.
+DRAFT_SUFFIXES = frozenset({".pdf", ".md", ".markdown", ".txt", ".html", ".htm"})
+
 #: Below this, a passage is a fragment rather than something to ask about.
 _MIN_PASSAGE_CHARS = 80
 #: Above this, a passage crowds the prompt without adding evidence.
@@ -104,7 +107,7 @@ def sample_files(folder: Path, *, limit: int = 12, per_document: int = 3) -> Pas
     same route ingestion would take and the passages the model sees are the
     passages the corpus would hold.
     """
-    from sci_rag.ingest.parsers import SUPPORTED_SUFFIXES, parse_file
+    from sci_rag.ingest.parsers import parse_file
 
     if not folder.exists():
         raise DraftError(
@@ -114,12 +117,12 @@ def sample_files(folder: Path, *, limit: int = 12, per_document: int = 3) -> Pas
     paths = sorted(
         path
         for path in folder.rglob("*")
-        if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
+        if path.is_file() and path.suffix.lower() in DRAFT_SUFFIXES
     )
     if not paths:
         raise DraftError(
             f"Found no supported documents under {folder} "
-            f"(looking for {', '.join(sorted(SUPPORTED_SUFFIXES))})."
+            f"(looking for {', '.join(sorted(DRAFT_SUFFIXES))})."
         )
 
     per_document = max(1, per_document)
@@ -163,6 +166,7 @@ async def sample_corpus(
             await session.execute(
                 select(Document.title, Chunk.content)
                 .join(Chunk, Chunk.document_id == Document.id)
+                .where(Document.is_current.is_(True))
                 # Ordered by title, not by id: ids are random, and a prompt
                 # that changes between two runs breaks the copy-paste lane.
                 .order_by(Document.title, Chunk.chunk_index)

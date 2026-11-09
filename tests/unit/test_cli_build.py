@@ -91,7 +91,12 @@ def test_credentialed_build_runs_extraction_then_communities(
 
     assert result.exit_code == 0, output
     assert len(stubs["extract"]) == 1
-    assert stubs["extract"][0] == {"batch_size": 4, "reprocess_all": False, "max_chunks": None}
+    assert stubs["extract"][0] == {
+        "batch_size": 4,
+        "reprocess_all": False,
+        "max_chunks": None,
+        "concurrency": 1,
+    }
     assert len(stubs["communities"]) == 1
     assert "Skipping" not in output
 

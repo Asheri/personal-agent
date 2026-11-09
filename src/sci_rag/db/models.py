@@ -15,22 +15,27 @@ asserts the dimension on every call so a mismatch fails loudly, not subtly.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Computed,
+    Date,
     DateTime,
     Float,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -74,8 +79,24 @@ class Document(Base):
     license_class: Mapped[str] = mapped_column(Text, default="unknown")
     license_source: Mapped[str | None] = mapped_column(Text)
 
-    # SHA-256 of the normalized text; ingesting the same content twice is a no-op.
+    # Content equality is separate from the identity of its local source.
     content_hash: Mapped[str] = mapped_column(String(64))
+    identity_key: Mapped[str] = mapped_column(
+        String(64), default=new_id, server_default=text("md5(random()::text)")
+    )
+    version_seq: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    version_of: Mapped[str | None] = mapped_column(String(32))
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", name="fk_documents_project_id")
+    )
+    project_source: Mapped[str | None] = mapped_column(Text)
+    tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
+    auto_tags: Mapped[list[str]] = mapped_column(ARRAY(Text), default=list, server_default="{}")
+    doc_date: Mapped[date | None] = mapped_column(Date)
+    doc_date_source: Mapped[str | None] = mapped_column(Text)
+    access_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_accessed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     page_count: Mapped[int | None] = mapped_column(Integer)
     chunk_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -89,12 +110,83 @@ class Document(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("content_hash", name="uq_documents_content_hash"),
+        CheckConstraint("access_count >= 0", name="ck_documents_access_count"),
+        CheckConstraint(
+            "doc_date_source IS NULL OR doc_date_source IN ('email_header','doc_property','file_mtime','ingested_at')",
+            name="ck_documents_doc_date_source",
+        ),
+        Index("ix_documents_doc_date", "doc_date"),
+        Index("ix_documents_last_accessed_at", "last_accessed_at"),
+        CheckConstraint(
+            "(project_id IS NULL AND project_source IS NULL) OR "
+            "(project_id IS NOT NULL AND project_source IS NOT NULL AND project_source IN ('manual','rule','inferred'))",
+            name="ck_documents_project_source",
+        ),
+        Index("ix_documents_project_id", "project_id"),
+        Index("ix_documents_tags", "tags", postgresql_using="gin"),
+        Index("ix_documents_auto_tags", "auto_tags", postgresql_using="gin"),
+        UniqueConstraint("id", "identity_key", name="uq_documents_id_identity"),
+        UniqueConstraint("identity_key", "version_seq", name="uq_documents_identity_seq"),
+        ForeignKeyConstraint(
+            ["version_of", "identity_key"],
+            ["documents.id", "documents.identity_key"],
+            name="fk_documents_predecessor_identity",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+        CheckConstraint("version_seq > 0", name="ck_documents_version_seq"),
+        CheckConstraint(
+            "version_of IS NULL OR version_seq > 1", name="ck_documents_predecessor_seq"
+        ),
+        Index(
+            "uq_documents_current_identity",
+            "identity_key",
+            unique=True,
+            postgresql_where=text("is_current"),
+        ),
+        Index(
+            "uq_documents_version_of",
+            "version_of",
+            unique=True,
+            postgresql_where=text("version_of IS NOT NULL"),
+        ),
+        Index("ix_documents_content_hash", "content_hash"),
         Index("ix_documents_source", "source"),
         Index("ix_documents_license_class", "license_class"),
         Index("ix_documents_journal", "journal"),
         Index("ix_documents_publication_year", "publication_year"),
     )
+
+
+class FileEvent(Base):
+    """Content-free refresh audit; deleted sources do not delete their event history."""
+
+    __tablename__ = "file_events"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(String(32), index=True)
+    root_key: Mapped[str] = mapped_column(String(64), index=True)
+    path_key: Mapped[str | None] = mapped_column(String(64))
+    channel: Mapped[str] = mapped_column(Text)
+    kind: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(Text)
+    counts: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (
+        CheckConstraint(
+            "channel IN ('manual','scheduler','hooks','poll')", name="ck_file_events_channel"
+        ),
+    )
+
+
+class Project(Base):
+    """A stable document grouping, separate from mentioned Project entities."""
+
+    __tablename__ = "projects"
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(Text)
+    slug: Mapped[str] = mapped_column(Text, unique=True)
+    __table_args__ = (Index("uq_projects_name_lower", func.lower(name), unique=True),)
 
 
 class Chunk(Base):
@@ -125,6 +217,11 @@ class Chunk(Base):
         TSVECTOR,
         Computed("to_tsvector('english', content)", persisted=True),
     )
+    search_tokens: Mapped[str] = mapped_column(Text, default="", server_default="")
+    search_zh_tsv: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed("to_tsvector('simple', search_tokens)", persisted=True),
+    )
 
     document: Mapped[Document] = relationship(back_populates="chunks")
 
@@ -144,7 +241,27 @@ class Chunk(Base):
         ),
         # Full-text index for the keyword retrieval layer.
         Index("ix_chunks_search_tsv", "search_tsv", postgresql_using="gin"),
+        Index("ix_chunks_search_zh_tsv", "search_zh_tsv", postgresql_using="gin"),
     )
+
+
+@event.listens_for(Chunk, "before_insert")
+@event.listens_for(Chunk, "before_update")
+def _index_chinese_chunk(mapper: Any, connection: Any, target: Chunk) -> None:
+    from sci_rag.keyword_tokens import index_search
+
+    target.search_tokens = index_search(target.content)
+
+
+class DocumentEmbedding(Base):
+    """Uncentered mean of one document's complete, same-version chunk vectors."""
+
+    __tablename__ = "document_embeddings"
+    document_id: Mapped[str] = mapped_column(
+        ForeignKey("documents.id", ondelete="CASCADE"), primary_key=True
+    )
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    embedding_version: Mapped[str] = mapped_column(Text)
 
 
 class DocumentCitation(Base):
@@ -159,11 +276,25 @@ class DocumentCitation(Base):
     cited_document_id: Mapped[str | None] = mapped_column(
         ForeignKey("documents.id", ondelete="CASCADE"), nullable=True
     )
-    cited_doi: Mapped[str] = mapped_column(Text, nullable=False)
+    cited_doi: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cited_key: Mapped[str | None] = mapped_column(Text)
+    evidence_chunk_id: Mapped[str | None] = mapped_column(
+        ForeignKey("chunks.id", name="fk_document_citations_evidence", ondelete="CASCADE")
+    )
+    confidence: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(Text, nullable=False, default="crossref")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     __table_args__ = (
+        UniqueConstraint("citing_document_id", "cited_key", name="uq_document_citations_key"),
+        CheckConstraint(
+            "cited_doi IS NOT NULL OR cited_document_id IS NOT NULL OR cited_key IS NOT NULL",
+            name="ck_document_citations_target",
+        ),
+        CheckConstraint(
+            "source <> 'mention' OR (cited_key IS NOT NULL AND evidence_chunk_id IS NOT NULL AND confidence IS NOT NULL AND confidence >= 0 AND confidence <= 1)",
+            name="ck_document_citations_mention",
+        ),
         UniqueConstraint(
             "citing_document_id", "cited_document_id", name="uq_document_citations_pair"
         ),

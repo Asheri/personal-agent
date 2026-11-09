@@ -12,11 +12,12 @@ everything".
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Literal
 
-from sqlalchemy import ColumnElement, or_
+from sqlalchemy import ColumnElement, and_, any_, func, or_, select
 
-from sci_rag.db.models import Document
+from sci_rag.db.models import Chunk, Document, KgEntity, KgRelationship
 
 Kind = Literal["chunk", "community"]
 Key = tuple[Kind, str]
@@ -48,24 +49,32 @@ class RetrievalScope:
     authors: tuple[str, ...] = ()
     journals: tuple[str, ...] = ()
     exclude_dois: tuple[str, ...] = ()
+    date_min: date | None = None
+    date_max: date | None = None
+    projects: tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
+    auto_tags: tuple[str, ...] = ()
+    entity_names: tuple[str, ...] = ()
 
     # Retraction awareness. Default OFF here so raw retrieval and every
     # existing ablation keep measuring what they measured before; the
     # ANSWER path turns it on, because citing a retracted paper as live
     # evidence is the failure that actually matters.
     exclude_retracted: bool = False
+    # A baseline exemption, independently of rights and metadata restrictions.
+    include_superseded: bool = False
 
     def denies_all(self) -> bool:
         return self.license_classes is not None and len(self.license_classes) == 0
 
     def is_unrestricted(self) -> bool:
-        """True only when nothing is filtered at all.
+        """True when no rights or metadata restriction is present.
 
         The community layer gates on this: a stored summary aggregates
         evidence across documents before any scope is known, so ANY
-        restriction has to disable it. Every field above must be
-        represented here, which is what tests/unit/test_retrieval_scope.py
-        pins down field by field.
+        restriction has to disable it. Current-version filtering remains a
+        separate baseline. The field coverage test in
+        tests/unit/test_retrieval_scope.py makes that distinction explicit.
         """
         return (
             self.license_classes is None
@@ -77,12 +86,20 @@ class RetrievalScope:
             and not self.journals
             and not self.exclude_dois
             and not self.exclude_retracted
+            and self.date_min is None
+            and self.date_max is None
+            and not self.projects
+            and not self.tags
+            and not self.auto_tags
+            and not self.entity_names
         )
 
 
 def scope_conditions(scope: RetrievalScope) -> list[ColumnElement[bool]]:
     """SQL conditions implementing a scope, for queries joined to documents."""
     conditions: list[ColumnElement[bool]] = []
+    if not scope.include_superseded:
+        conditions.append(Document.is_current.is_(True))
     if scope.license_classes is not None:
         conditions.append(Document.license_class.in_(scope.license_classes))
     if scope.sources is not None:
@@ -104,6 +121,24 @@ def scope_conditions(scope: RetrievalScope) -> list[ColumnElement[bool]]:
         conditions.append(or_(Document.doi.is_(None), Document.doi.not_in(scope.exclude_dois)))
     if scope.exclude_retracted:
         conditions.append(_not_retracted())
+    if scope.date_min is not None:
+        conditions.append(or_(Document.doc_date.is_(None), Document.doc_date >= scope.date_min))
+    if scope.date_max is not None:
+        conditions.append(or_(Document.doc_date.is_(None), Document.doc_date <= scope.date_max))
+    if scope.projects:
+        conditions.append(Document.project_id.in_(scope.projects))
+    if scope.tags:
+        conditions.append(Document.tags.overlap(list(scope.tags)))
+    if scope.auto_tags:
+        conditions.append(Document.auto_tags.overlap(list(scope.auto_tags)))
+    if scope.entity_names:
+        conditions.append(
+            select(Chunk.id)
+            .join(KgEntity, Chunk.id == any_(KgEntity.chunk_ids))
+            .where(Chunk.document_id == Document.id, KgEntity.name.in_(scope.entity_names))
+            .correlate(Document)
+            .exists()
+        )
     return conditions
 
 
@@ -117,6 +152,23 @@ def _not_retracted() -> ColumnElement[bool]:
     """
     flag = Document.extra["crossref"]["is_retracted"]
     return or_(flag.is_(None), flag.as_boolean().is_(False))
+
+
+def entity_scope_condition(scope: RetrievalScope) -> ColumnElement[bool]:
+    """Aggregate descriptions require all attributed documents to be eligible."""
+    eligible = select(func.array_agg(Document.id)).where(*scope_conditions(scope)).scalar_subquery()
+    return and_(
+        func.cardinality(KgEntity.document_ids) > 0, KgEntity.document_ids.contained_by(eligible)
+    )
+
+
+def relationship_scope_condition(scope: RetrievalScope) -> ColumnElement[bool]:
+    documents = select(Document.id).where(*scope_conditions(scope))
+    chunks = select(Chunk.id).join(Document).where(*scope_conditions(scope))
+    return or_(
+        KgRelationship.document_id.in_(documents),
+        and_(KgRelationship.document_id.is_(None), KgRelationship.chunk_id.in_(chunks)),
+    )
 
 
 @dataclass

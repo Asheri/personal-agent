@@ -1,5 +1,12 @@
 # 增量更新设计：文档级 reconcile
 
+> Scoped supersession (2026-10-24): this historical proposal is preserved.
+> The v1.4 candidate and ADR 0013 replace its deletion-on-update/global-hash
+> assumptions with retained revisions, checked PendingIngest, metadata signatures,
+> and conservative missing-source deletion. The current-evidence community filter
+> removes the need for automatic global GC. Actual database/sample acceptance and
+> nonauthor review remain deferred; the historical approval below is not new approval.
+
 - 日期：2026-10-08
 - 状态：已批准（分 5 节逐节确认）
 - 决策：**自研 reconcile，不接入 CocoIndex**
@@ -36,7 +43,7 @@
 ### 证据出处（重要）
 
 - **探针跑在 PyPI `cocoindex==1.0.25`**（2026-10-08 安装到独立 venv，未污染 kit 的 `.venv`）。
-- 本地检出 `C:\Users\12062\OneDrive\Desktop\items\cocoindex`（HEAD `8c3c93ea`，2026-09-28）与它**不是同一份代码**：`python/cocoindex/connectors/postgres/_target.py` 里查不到 `_array_literal` 与 `typcategory`（只存在于编译产物 `.pdb`）。因此第 6 号探针的机制说明标注为 **1.0.25 site-packages 行号**，本地检出无此代码路径。
+- 本地检出 `items/cocoindex`（HEAD `8c3c93ea`，2026-09-28）与它**不是同一份代码**：`python/cocoindex/connectors/postgres/_target.py` 里查不到 `_array_literal` 与 `typcategory`（只存在于编译产物 `.pdb`）。因此第 6 号探针的机制说明标注为 **1.0.25 site-packages 行号**，本地检出无此代码路径。
 - 两处一致、可直接引用本地检出的：`connectorkits/statediff.py:128`、`connectors/postgres/_target.py:5`（"Table level: Creates/drops tables"）、`_target.py:1050`（`DROP TABLE IF EXISTS`）。
 
 ### CocoIndex 的模型

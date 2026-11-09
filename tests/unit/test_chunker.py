@@ -127,3 +127,19 @@ def test_dehyphenation_and_page_numbers() -> None:
     joined = " ".join(c.body for c in chunks)
     assert "lignocellulosic" in joined
     assert "\n42\n" not in joined
+
+
+def test_oversized_table_splits_by_rows_and_repeats_header() -> None:
+    rows = [f"| item-{i:03d} | {i} |" for i in range(40)]
+    markdown = "# T\n\n## S\n\n| name | value |\n| --- | --- |\n" + "\n".join(rows)
+    doc = parse_markdown(markdown, fallback_title="T")
+    chunks = chunk_document(doc, target_tokens=40, overlap_tokens=0)
+    tables = [c for c in chunks if c.is_table]
+    assert len(tables) > 1
+    for table in tables:
+        lines = table.body.splitlines()
+        assert lines[0] == "| name | value |"
+        assert lines[1].startswith("| ---")
+        assert table.token_count <= 60
+    data_rows = [line for table in tables for line in table.body.splitlines()[2:]]
+    assert data_rows == rows

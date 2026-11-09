@@ -112,7 +112,7 @@ async def enrich_documents(
     async with session_factory() as session:
         query = (
             select(Document.id, Document.doi, Document.extra)
-            .where(Document.doi.is_not(None))
+            .where(Document.doi.is_not(None), Document.is_current.is_(True))
             .order_by(Document.id)
         )
         if limit is not None:

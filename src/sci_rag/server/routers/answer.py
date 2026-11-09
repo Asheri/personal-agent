@@ -84,6 +84,12 @@ async def answer(
         exclude_dois=body.exclude_dois,
         api_key_override=api_key_override,
         include_compression=body.include_compression,
+        date_min=body.date_min,
+        date_max=body.date_max,
+        projects=body.projects,
+        tags=body.tags,
+        auto_tags=body.auto_tags,
+        entity_names=body.entity_names,
     )
     if body.stream:
         return EventSourceResponse(_sse_events(events))

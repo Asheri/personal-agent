@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text, update
 
-from sci_rag.cli.doctor import _run_checks
+from sci_rag.cli.doctor import _LATEST_SCHEMA_REVISION, _run_checks
 from sci_rag.db import Document, KgEntity, get_engine, get_session_factory
 from sci_rag.ingest import ingest_entries, load_manifest
 
@@ -24,7 +24,10 @@ async def _stamp_alembic_revision() -> None:
             text("CREATE TABLE IF NOT EXISTS alembic_version (version_num varchar(32) PRIMARY KEY)")
         )
         await conn.execute(text("DELETE FROM alembic_version"))
-        await conn.execute(text("INSERT INTO alembic_version VALUES ('0007')"))
+        await conn.execute(
+            text("INSERT INTO alembic_version VALUES (:revision)"),
+            {"revision": _LATEST_SCHEMA_REVISION},
+        )
 
 
 async def test_doctor_reports_outdated_schema_before_new_column_queries(clean_tables) -> None:  # type: ignore[no-untyped-def]
@@ -35,7 +38,7 @@ async def test_doctor_reports_outdated_schema_before_new_column_queries(clean_ta
     try:
         checks = _by_name(await _run_checks(probe=False))
         assert checks["schema"].status == "fail"
-        assert "expected 0007" in checks["schema"].detail
+        assert f"expected {_LATEST_SCHEMA_REVISION}" in checks["schema"].detail
         assert "db upgrade" in checks["schema"].fix
     finally:
         async with get_engine().begin() as conn:
@@ -55,7 +58,10 @@ async def test_doctor_reports_outdated_schema_before_new_column_queries(clean_ta
                     "ON kg_entities (canonical_entity_id)"
                 )
             )
-            await conn.execute(text("UPDATE alembic_version SET version_num = '0007'"))
+            await conn.execute(
+                text("UPDATE alembic_version SET version_num = :revision"),
+                {"revision": _LATEST_SCHEMA_REVISION},
+            )
 
 
 def _by_name(checks) -> dict[str, object]:  # type: ignore[no-untyped-def]

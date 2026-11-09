@@ -37,7 +37,7 @@ _PROMPT_FILES = (
     "judge_grounding",
     "judge_correctness",
 )
-_LATEST_SCHEMA_REVISION = "0007"
+_LATEST_SCHEMA_REVISION = "0013"
 _MODELSCOPE_INSTALL_FIX = "uv sync --extra modelscope-embedding"
 
 
@@ -123,7 +123,8 @@ def _ontology_coherence_check(config: DomainConfig) -> Check:
         "ontology",
         "ok",
         f"{len(config.entity_types)} entity types, {len(config.relation_types)} relation "
-        f"types, {len(config.query_classes)} query classes, names unique",
+        f"types, {len(config.query_classes)} query classes, names unique; entity types: "
+        + ", ".join(spec.name for spec in config.entity_types),
     )
 
 
@@ -516,6 +517,7 @@ async def _run_checks(*, probe: bool) -> list[Check]:
 
     seed_questions: list[SeedQuestion] = []
     if domain is not None:
+        checks.append(Check("entity types", "ok", ", ".join(domain.entity_type_names)))
         checks.append(_ontology_coherence_check(domain.config))
         try:
             from sci_rag.evals import load_seed_questions
@@ -652,6 +654,7 @@ async def _run_checks(*, probe: bool) -> list[Check]:
         for table, column in (
             ("chunks", "embedding"),
             ("kg_communities", "summary_embedding"),
+            ("document_embeddings", "embedding"),
         ):
             column_type = await conn.scalar(
                 text(
@@ -681,6 +684,25 @@ async def _run_checks(*, probe: bool) -> list[Check]:
             checks.append(Check("embedding dimension", "ok", expected_vector_type))
 
         documents = await conn.scalar(text("SELECT count(*) FROM documents")) or 0
+        refresh_row = (
+            await conn.execute(
+                text(
+                    "SELECT status,counts FROM file_events WHERE kind='run' ORDER BY created_at DESC,id DESC LIMIT 1"
+                )
+            )
+        ).first()
+        checks.append(
+            Check(
+                "refresh history",
+                "warn"
+                if refresh_row is not None
+                and refresh_row.status in {"failed", "interrupted", "running"}
+                else "ok",
+                "no refresh runs recorded"
+                if refresh_row is None
+                else f"latest={refresh_row.status}; source counts={refresh_row.counts}",
+            )
+        )
         chunks = await conn.scalar(text("SELECT count(*) FROM chunks")) or 0
         unembedded = (
             await conn.scalar(text("SELECT count(*) FROM chunks WHERE embedding IS NULL")) or 0
@@ -705,6 +727,23 @@ async def _run_checks(*, probe: bool) -> list[Check]:
             )
         else:
             checks.append(Check("corpus", "ok", f"{documents} documents, {chunks} chunks"))
+
+        from sci_rag.reconcile import source_path_for
+
+        source_rows = (await conn.execute(text("SELECT extra, source_ref FROM documents"))).all()
+        no_path = sum(
+            source_path_for(row.extra or {}, row.source_ref) is None for row in source_rows
+        )
+        checks.append(
+            Check(
+                "source paths",
+                "warn" if no_path else "ok",
+                f"{no_path} documents without a recorded path",
+                "Review legacy imports; reconciliation never guesses missing paths."
+                if no_path
+                else "",
+            )
+        )
 
         # Only meaningful once documents exist: a reference title that matches
         # nothing scores zero forever, and it reads as a retrieval failure.

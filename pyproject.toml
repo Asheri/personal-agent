@@ -24,6 +24,7 @@ dependencies = [
   "alembic>=1.13",
   "pgvector>=0.3.0",
   "pyyaml>=6.0",
+  "jieba==0.42.1",
   "typer>=0.12",
   "rich>=13.7",
   "questionary>=2.1",
@@ -39,6 +40,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+office = ["python-docx>=1.2.0", "python-pptx>=1.0.2", "openpyxl>=3.1.5"]
+ocr = ["Pillow>=10", "pypdfium2>=4.30"]
+ocr-tesseract = ["Pillow>=10", "pypdfium2>=4.30"]
 # Docling gives the best PDF parsing (real table extraction), but pulls in a
 # large ML stack. The kit falls back to pypdf when docling is not installed.
 docling = ["docling>=2.15"]
@@ -78,6 +82,11 @@ dev = [
   "mypy>=1.10",
   "ruff>=0.4",
   "types-pyyaml",
+  # Exercise the optional Office parsers in the default development tests.
+  "python-docx>=1.2.0",
+  "python-pptx>=1.0.2",
+  "openpyxl>=3.1.5",
+  "pypdfium2>=4.30",
   # The `export` extra, pulled into dev so CI actually exercises the Parquet
   # writer rather than skipping it. A skipped test is not evidence.
   "pyarrow>=17.0",

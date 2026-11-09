@@ -52,7 +52,10 @@ _WALK_SQL = text(
                     FROM unnest(chunk_ids) AS entity_chunk_id
                     JOIN chunks seed_chunk ON seed_chunk.id = entity_chunk_id
                     WHERE seed_chunk.document_id = ANY(:eligible_document_ids)
-                      AND btrim(regexp_replace(
+                      AND (:rights_unrestricted OR (
+                        (kg_entities.name ~ '[㐀-䶿一-鿿]'
+                         AND position(lower(kg_entities.name) IN lower(seed_chunk.content)) > 0)
+                        OR (btrim(regexp_replace(
                             lower(kg_entities.name), '[^[:alnum:]]+', ' ', 'g'
                           )) <> ''
                       AND position(
@@ -63,7 +66,7 @@ _WALK_SQL = text(
                             ' ' || btrim(regexp_replace(
                                 lower(seed_chunk.content), '[^[:alnum:]]+', ' ', 'g'
                             )) || ' '
-                          ) > 0
+                          ) > 0)))
                 )
           )
         UNION
@@ -152,6 +155,7 @@ _WALK_SQL = text(
     FROM candidates
     JOIN chunks ranked_chunk ON ranked_chunk.id = candidates.id
     JOIN documents ranked_document ON ranked_document.id = ranked_chunk.document_id
+    WHERE (:include_superseded OR ranked_document.is_current)
     ORDER BY CASE WHEN :confidence_weighted
                   THEN candidates.path_confidence END DESC NULLS LAST,
              candidates.hop,
@@ -199,7 +203,7 @@ async def graph_stage(
     lowered = sorted({name.lower() for name in names})
 
     async with session_factory() as session:
-        unrestricted = scope.is_unrestricted()
+        unrestricted = scope.is_unrestricted() and scope.include_superseded
         eligible_document_ids: list[str] = []
         if not unrestricted:
             eligible_document_ids = list(
@@ -218,9 +222,12 @@ async def graph_stage(
                     "min_confidence": min_confidence,
                     "confidence_weighted": confidence_weighted,
                     "include_citations": include_citations,
-                    # Restricted callers seed only exact names proven in
-                    # eligible chunk content; aliases lack per-surface provenance.
-                    "allow_aliases": unrestricted,
+                    # Restricted callers require literal evidence in eligible
+                    # content. CJK names need no word boundary; C-locale alnum
+                    # classes can strip them entirely. Aliases lack provenance.
+                    "allow_aliases": scope.is_unrestricted(),
+                    "rights_unrestricted": scope.is_unrestricted(),
+                    "include_superseded": scope.include_superseded,
                     "unrestricted": unrestricted,
                     "eligible_document_ids": eligible_document_ids,
                     "limit": limit,

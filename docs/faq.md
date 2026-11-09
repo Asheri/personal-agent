@@ -204,7 +204,37 @@ Docker and CI exercise PostgreSQL 16, while the current conda-forge development 
 The supported range is PostgreSQL 16 through 18. [ADR
 0008](adr/0008-supported-postgresql-versions.md) defines how that range is tested and updated.
 
+### Why keep equal-content copies and earlier revisions?
+
+Local path and member identity distinguish source copies from content equality.
+Each identity retains its revisions, while normal evidence reads use only its current
+row. [ADR 0014](adr/0014-document-identity-and-current-versions.md) explains the pending
+PC-Mem decision, transaction rules, and safe rollback limits. See
+[document versions](document-versions.md) for current behavior and remaining work.
+
+### How are personal project assignments kept stable?
+
+Document ownership uses manual, rule, and inferred sources in that order. Automatic
+passes preserve manual choices, and source revisions inherit them. Manual and automatic
+tags occupy separate columns. [ADR 0015](adr/0015-personal-project-ownership.md) records
+the pending decision and [personal extraction](personal-extraction.md) shows the workflow.
+
+### How does repeated ingestion handle changed or missing files?
+
+Unchanged stat/configuration fingerprints skip parsing. Changed content retains
+revisions; equal parsed content refreshes current metadata. Only confirmed missing
+in-root sources can lose their stored chains. [ADR 0013](adr/0013-document-level-reconciliation.md)
+records this pending decision. See [incremental reconciliation](incremental-reconcile.md)
+for deletion guards and the deferred database acceptance run.
+
 ## Retrieval and answers
+
+### How can an Agent follow related files and retained revisions?
+
+Use the registered `get_related_documents` and `get_document_versions` MCP tools,
+or the equivalent REST endpoints and `relate` commands. [ADR 0016](adr/0016-scoped-document-relations.md)
+records the scoped relation design. [Document relations](document-relations.md) explains
+literal evidence, visible-corpus similarity, and the distinction from model answer quality.
 
 ### Why five retrieval layers? {#why-five-retrieval-layers-is-vector-search-not-enough}
 
@@ -290,7 +320,39 @@ It contributes no candidates, the request continues, and the trace says `timeout
 
 ## Extending and adapting
 
+### How does PC-Mem search Chinese file content?
+
+Chinese questions use a separate jieba search-token index; English queries keep
+the existing full-text path. [ADR 0017](adr/0017-chinese-keyword-index.md) explains
+the measured choice and migration costs. [Chinese retrieval](chinese-retrieval.md)
+describes the behavior and controlled spike limits.
+
+### How does PC-Mem reject unsupported extraction output?
+
+[ADR 0018](adr/0018-grounded-extraction.md) defines source-checked names and aliases,
+typed relation endpoints, and literal passage evidence. Invalid edges are rejected.
+[Controlled personal-file quality](personal-quality.md) explains the actual-model
+tests and why their constructed labels still need independent human review.
+
+### Can extraction run several batches at once?
+
+`sci-rag graph extract --concurrency N` keeps N batches in flight. The default is
+1, which is the setting every earlier report was produced with. Batches overlap
+their model calls and still write one at a time behind the document-write lock, so
+the stored graph does not depend on the flag.
+[ADR 0021](adr/0021-graph-extraction-concurrency.md) records the merge argument and
+the conditions that would send it back to serial.
+
 ### Can I add my own parser, reranker, or model provider?
+
+[Core engineering](core-completion.md) and [Agent deployment](deploy-pcmem.md)
+describe browsing, refresh, and memory integration.
+[ADR 0020](adr/0020-core-browse-refresh-memory.md) explains the shared writer and
+the narrower external-tool rights boundary.
+
+[Local file types](file-types.md) lists the built-in extensions, OCR setup, and
+mailbox limits. [ADR 0019](adr/0019-local-file-parsing.md) explains the atomic host
+write and the content-key fallback for messages without Message-ID.
 
 Yes. The public contracts for the supported extension points are:
 

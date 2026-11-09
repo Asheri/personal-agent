@@ -77,6 +77,12 @@ async def query(
         include_community=body.include_community,
         include_hyde=body.include_hyde,
         include_rerank=body.include_rerank,
+        date_min=body.date_min,
+        date_max=body.date_max,
+        projects=body.projects,
+        tags=body.tags,
+        auto_tags=body.auto_tags,
+        entity_names=body.entity_names,
     )
     items, traces = result_to_models(result, include_content=body.include_content)
     return QueryResponse(

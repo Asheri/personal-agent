@@ -7,12 +7,44 @@ constraints here are the API's input validation; keep them honest.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, SecretStr
+from pydantic import BaseModel, Field, SecretStr, model_validator
 
 
-class QueryRequest(BaseModel):
+class CorpusFilters(BaseModel):
+    date_min: date | None = None
+    date_max: date | None = None
+    projects: list[str] | None = None
+    tags: list[str] | None = None
+    auto_tags: list[str] | None = None
+    entity_names: list[str] | None = None
+
+    @model_validator(mode="after")
+    def ordered_dates(self):  # type: ignore[no-untyped-def]
+        if (
+            self.date_min is not None
+            and self.date_max is not None
+            and self.date_min > self.date_max
+        ):
+            raise ValueError("date_min must precede date_max")
+        return self
+
+
+class BrowseFilters(CorpusFilters):
+    license_classes: list[str] | None = None
+    sources: list[str] | None = None
+    year_min: int | None = None
+    year_max: int | None = None
+    authors: list[str] | None = None
+    journals: list[str] | None = None
+    exclude_dois: list[str] | None = None
+    exclude_retracted: bool = False
+    model_config = {"extra": "forbid"}
+
+
+class QueryRequest(CorpusFilters):
     query: str = Field(
         ..., min_length=1, max_length=2000, description="The question to search for."
     )
@@ -104,7 +136,7 @@ class QueryResponse(BaseModel):
     )
 
 
-class AnswerRequest(BaseModel):
+class AnswerRequest(CorpusFilters):
     query: str = Field(..., min_length=1, max_length=2000)
     top_k: int = Field(8, ge=1, le=20, description="Sources given to the model.")
     profile: Literal["interactive", "deep"] = "deep"

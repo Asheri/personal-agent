@@ -29,6 +29,8 @@ Four types, from the [Diataxis](https://diataxis.fr/) framework. A page that can
 | `bring-your-own-domain.md` | tutorial |
 | `campaigns.md` | how-to |
 | `evaluation.md` | how-to |
+| `benchmark-catalogue.md` | explanation |
+| `benchmark-catalogue.zh.md` | explanation |
 | `extend.md` | how-to |
 | `operations.md` | how-to |
 | `deploy-gcp.md` | how-to |

@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     # --- Database -----------------------------------------------------------
     database_url: str = "postgresql+asyncpg://sci_rag:sci_rag@localhost:5433/sci_rag"
 
+    # Optional offline OCR; no executable or language data is downloaded at runtime.
+    ocr_tesseract_cmd: str | None = None
+    ocr_tessdata_dir: Path | None = None
+    ocr_languages: str = "chi_sim+eng"
+
     # --- Google credentials (either an AI Studio key or a GCP project) ------
     google_api_key: str | None = None
     gcp_project: str | None = None
@@ -116,10 +121,13 @@ class Settings(BaseSettings):
             and bool(cuda_index)
             and all("0" <= character <= "9" for character in cuda_index)
         )
-        if normalized in {"auto", "cpu", "cuda"} or is_cuda_index:
+        # `mps` is the Apple GPU backend. Without it a macOS user has to spell
+        # the device as `auto` and hope, and the difference between running the
+        # embedder on the GPU and on the CPU is minutes per corpus.
+        if normalized in {"auto", "cpu", "cuda", "mps"} or is_cuda_index:
             return normalized
         raise ValueError(
-            "modelscope_device must be auto, cpu, cuda, or cuda:N "
+            "modelscope_device must be auto, cpu, cuda, cuda:N, or mps "
             "(case-insensitive; surrounding whitespace is ignored)."
         )
 

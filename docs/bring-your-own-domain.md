@@ -88,6 +88,11 @@ Setup writes ordinary files, and nothing regenerates them later. Re-run it to ch
 
 Put PDFs, HTML pages, Markdown, or plain-text files in `data/raw/`.
 
+For DOCX and PPTX files, install `uv sync --extra office` first. Folder discovery
+and ingestion accept both formats. Draft commands keep their previous PDF,
+HTML, Markdown, and text inputs. See [Office parsers](office-parsers.md) for
+supported structures and limits.
+
 - Choose documents that contain answers. Reviews, reports, and characterization papers hold more retrievable facts than commentary and slide decks.
 - Know each document's redistribution rights. The system quotes these documents back to people. A public-domain or CC BY document is fine anywhere. A paywalled PDF you legitimately hold is fine for your own instance, but mark it `restricted` so it never appears on a service you share.
 - Start with a corpus small enough to inspect and defend. A curated set plus

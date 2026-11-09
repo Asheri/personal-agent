@@ -180,8 +180,16 @@ async def _seed_demo(
     audit_row: bool = False,
 ) -> None:
     documents = (
-        ("Alpha fixture", "Alpha is a synthetic agricultural residue.", first_ids),
-        ("Beta fixture", "Beta is a synthetic agricultural region.", second_ids),
+        (
+            "Alpha fixture",
+            "Alpha is a synthetic agricultural residue. alpha feedstock has synthetic location evidence in beta region. The record mentions almond prunings and orchard prunings, both called prunings.",
+            first_ids,
+        ),
+        (
+            "Beta fixture",
+            "Beta is a synthetic agricultural region. beta region contains alpha feedstock as synthetic location evidence. The record mentions almond prunings and orchard prunings, both called prunings.",
+            second_ids,
+        ),
     )
     async with get_session_factory()() as session:
         for title, content, (document_id, chunk_id) in documents:
@@ -236,8 +244,16 @@ def _write_tracked_demo(tmp_path: Path) -> Path:
     fixture = tmp_path / "fixture"
     fixture.mkdir()
     documents = (
-        ("alpha.md", "Alpha fixture", "Alpha is a synthetic agricultural residue."),
-        ("beta.md", "Beta fixture", "Beta is a synthetic agricultural region."),
+        (
+            "alpha.md",
+            "Alpha fixture",
+            "Alpha is a synthetic agricultural residue. alpha feedstock has synthetic location evidence in beta region. The record mentions almond prunings and orchard prunings, both called prunings.",
+        ),
+        (
+            "beta.md",
+            "Beta fixture",
+            "Beta is a synthetic agricultural region. beta region contains alpha feedstock as synthetic location evidence. The record mentions almond prunings and orchard prunings, both called prunings.",
+        ),
     )
     rows: list[str] = []
     for filename, title, content in documents:

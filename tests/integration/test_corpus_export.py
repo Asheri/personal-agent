@@ -210,10 +210,10 @@ async def test_an_entity_straddling_the_scope_boundary_is_not_exported(
     assert not any("restricted" in (entity["description"] or "") for entity in exported)
 
 
-async def test_an_unscoped_export_keeps_every_entity(
+async def test_default_export_omits_unattributed_entities_and_history_opt_in_restores_all(
     clean_tables, mixed_rights_corpus, local_embedder, tmp_path
 ):  # type: ignore[no-untyped-def]
-    """The strict rule is a property of scoping, not a permanent filter."""
+    """Default visibility needs provenance; an explicit all-history export is available."""
     await ingest_entries(mixed_rights_corpus, embedder=local_embedder)
     ids = await _document_ids_by_title()
 
@@ -235,7 +235,17 @@ async def test_an_unscoped_export_keeps_every_entity(
     await export_corpus(get_session_factory(), directory=outdir, fmt="jsonl")
 
     exported = {entity["id"] for entity in _read_jsonl(outdir / "entities.jsonl")}
-    assert exported == {"e_straddling", "e_unattributed"}
+    assert exported == {"e_straddling"}
+    await export_corpus(
+        get_session_factory(),
+        directory=outdir,
+        fmt="jsonl",
+        scope=RetrievalScope(include_superseded=True),
+    )
+    assert {entity["id"] for entity in _read_jsonl(outdir / "entities.jsonl")} == {
+        "e_straddling",
+        "e_unattributed",
+    }
 
 
 async def test_a_relationship_survives_only_with_its_document_and_both_endpoints(

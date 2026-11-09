@@ -17,8 +17,8 @@ migrations, `domain/`, and data paths resolve predictably.
 | `sci-rag new` | Create a new Sci RAG Kit project. |
 | `sci-rag init` | Configure an existing Sci RAG Kit checkout in place. |
 | `sci-rag doctor` | Diagnose the environment: config, domain, database, corpus, credentials. |
-| `sci-rag ingest` | Ingest documents: parse, chunk, embed, and store them. |
-| `sci-rag build` | Build the knowledge base in one go: ingest, then extract the graph and its summaries. |
+| `sci-rag ingest` | Reconcile sources: skip unchanged files, retain revisions, remove missing sources. |
+| `sci-rag build` | Build the knowledge base: reconcile sources, then update the graph and summaries. |
 | `sci-rag retrieve` | Search the corpus and show the evidence: which layer found each result, and why it ranked. |
 | `sci-rag answer` | Answer a question from your documents, with numbered citations. |
 | `sci-rag stats` | Show what is in the knowledge base: documents, chunks, graph size, licenses. |
@@ -29,10 +29,19 @@ migrations, `domain/`, and data paths resolve predictably.
 | `sci-rag db upgrade` | Create or upgrade the database schema (runs the Alembic migrations). |
 | `sci-rag graph` | Build the knowledge graph: extract concepts and relationships from your documents, then summarize the clusters they form. |
 | `sci-rag graph extract` | Extract concepts and relationships from ingested chunks. |
+| `sci-rag graph reset` | Clear derived entities, edges, and communities before an ontology rebuild. |
 | `sci-rag graph communities` | Group related entities into clusters and write a summary of each (rebuilds all). |
 | `sci-rag graph citations` | Link corpus documents that cite each other, from the reference lists `corpus enrich` fetched. |
 | `sci-rag graph resolve-entities` | Resolve duplicate graph entities conservatively and audit every merge. |
 | `sci-rag graph gc` | Remove graph leftovers: entities with no evidence, relationships with a missing end, and communities whose members are gone. |
+| `sci-rag project` | Manage document projects and personal metadata. |
+| `sci-rag project create` | Create a project explicitly and print its stable id. |
+| `sci-rag project list` | List projects and their current document counts. |
+| `sci-rag project assign` | Assign a current document manually and lock its ownership. |
+| `sci-rag project tags` | Replace manual tags while preserving automatic tags. |
+| `sci-rag project classify` | Apply ownership rules, infer remaining projects, and extract automatic tags. |
+| `sci-rag project rules` | Check directory ownership rules. |
+| `sci-rag project rules check` | Report current documents matching multiple different projects. |
 | `sci-rag campaign` | Find papers to add: search by topic or DOI list, check each one's rights, and download the open-access PDFs into a manifest you can ingest. |
 | `sci-rag campaign discover` | Discover a deduplicated DOI list and save resumable state. |
 | `sci-rag campaign build` | Check each candidate's rights, download the open-access PDFs, and write a manifest to ingest. |
@@ -46,12 +55,30 @@ migrations, `domain/`, and data paths resolve predictably.
 | `sci-rag draft manifest` | Read title, authors, year, and source off your documents. |
 | `sci-rag draft ontology` | Redraft or refine the ontology against what your documents actually say. |
 | `sci-rag draft prompts` | Reword a prompt for your field. |
+| `sci-rag relate` | Inspect source-attributed document relations. |
+| `sci-rag relate similar` | Rank current documents using centered means in the caller's visible corpus. |
+| `sci-rag relate projects` | List other visible documents assigned to the same project. |
+| `sci-rag relate citations` | Read visible outgoing and incoming references with source evidence. |
+| `sci-rag relate versions` | Explicitly inspect retained revisions, preserving all other scope filters. |
+| `sci-rag relate mentions` | Detect literal local links and DOI mentions; default to a dry run. |
+| `sci-rag relate embeddings` | Rebuild document means from existing chunk vectors without model calls. |
+| `sci-rag browse` | Browse current files by project, document date, and named topic. |
+| `sci-rag browse documents` | List current files in document-date order, with explicit pagination. |
+| `sci-rag browse facets` | Count every registered dimension, including empty-value buckets. |
+| `sci-rag browse projects` | Browse project counts or documents belonging to one project. |
+| `sci-rag browse timeline` | Browse document-date months, retaining the unknown-date bucket. |
+| `sci-rag browse topics` | Browse literal named topics; community summaries never define filters. |
 | `sci-rag eval` | Measure quality against your seed questions: retrieval scores, what each retrieval layer contributes, and graded answers. |
 | `sci-rag eval retrieval` | Score retrieval against your seed questions: did the right documents come back? |
 | `sci-rag eval answers` | Answer every seed question and grade each answer for grounding, citations, and correctness. |
 | `sci-rag eval diff` | Compare two eval runs: per-question rank moves and paired metric deltas. |
 | `sci-rag eval html` | Render an eval run as one self-contained HTML page. |
 | `sci-rag eval calibrate` | Compare a person's scores with the grader's, per dimension (reported as Cohen's kappa). |
+| `sci-rag refresh` | Refresh local files and inspect durable run history. |
+| `sci-rag refresh run` | Run one guarded refresh, persist its result, and return its actual exit code. |
+| `sci-rag refresh history` | List content-free outcomes, including failed and interrupted runs. |
+| `sci-rag agent` | Invoke the local Agent memory adapter. |
+| `sci-rag agent call` | Read a JSON payload on stdin and return the local operation result. |
 | `sci-rag embed` | Re-embed rows left behind after an embedding model change. |
 | `sci-rag embed reindex` | Re-embed chunks and community summaries that an older embedding model produced. |
 | `sci-rag corpus` | Look after the corpus: rights report, publication metadata, snapshots, export, and deletion. |
@@ -117,7 +144,7 @@ $ sci-rag doctor [OPTIONS]
 
 ## `sci-rag ingest`
 
-Ingest documents: parse, chunk, embed, and store them. Pass a folder for a first run (every document is recorded with license_class "unknown"), or a manifest once you have declared each document's rights. `sci-rag build` runs this and the graph steps together.
+Reconcile sources: skip unchanged files, retain revisions, remove missing sources. Pass a folder for a first run (every document is recorded with license_class "unknown"), or a manifest once you have declared each document's rights. `sci-rag build` runs this and the graph steps together.
 
 ```console
 $ sci-rag ingest [OPTIONS] [PATH]
@@ -127,7 +154,7 @@ $ sci-rag ingest [OPTIONS] [PATH]
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `PATH` | path | unset | Folder of documents to ingest (PDF, HTML, Markdown, or plain text). |
+| `PATH` | path | unset | Folder of supported local files (documents, mail, code, data, and OCR images). |
 
 ### Options
 
@@ -141,7 +168,7 @@ $ sci-rag ingest [OPTIONS] [PATH]
 
 ## `sci-rag build`
 
-Build the knowledge base in one go: ingest, then extract the graph and its summaries. Ingestion works with any embedding setup, including offline. The graph steps need LLM provider credentials; without them, or with --no-graph, they are skipped and the command says so. Re-running only processes new chunks.
+Build the knowledge base: reconcile sources, then update the graph and summaries. Ingestion works with any embedding setup, including offline. The graph steps need LLM provider credentials; without them, or with --no-graph, they are skipped and the command says so. Re-running only processes new chunks.
 
 ```console
 $ sci-rag build [OPTIONS] [PATH]
@@ -151,7 +178,7 @@ $ sci-rag build [OPTIONS] [PATH]
 
 | Name | Type | Default | Description |
 |---|---|---|---|
-| `PATH` | path | unset | Folder of documents to ingest (PDF, HTML, Markdown, or plain text). |
+| `PATH` | path | unset | Folder of supported local files (documents, mail, code, data, and OCR images). |
 
 ### Options
 
@@ -162,6 +189,7 @@ $ sci-rag build [OPTIONS] [PATH]
 | `--no-docling` | boolean | false | Skip Docling even if installed (use the pypdf fallback). |
 | `--no-graph` | boolean | false | Stop after ingestion; skip the knowledge graph. |
 | `--batch-size` | integer | 10 | Chunks per graph-extraction model call. |
+| `--concurrency` | integer range | 1 | Graph-extraction batches to keep in flight; 1 processes them in order. |
 
 ## `sci-rag retrieve`
 
@@ -191,6 +219,7 @@ $ sci-rag retrieve [OPTIONS] QUERY
 | `--journal` | text | unset | Comma-separated journal allowlist. |
 | `--exclude-doi` | text | unset | Comma-separated DOIs to drop. |
 | `--explain-routing` | boolean | false | Print what the auto router decides for this query (and why) before retrieving. |
+| `--filters` | text | unset | JSON corpus filters, including document dates, projects, and tags. |
 
 ## `sci-rag answer`
 
@@ -221,6 +250,7 @@ $ sci-rag answer [OPTIONS] QUERY
 | `--exclude-doi` | text | unset | Comma-separated DOIs to drop. |
 | `--include-retracted` | boolean | false | Deliberately allow known retracted papers as answer evidence. |
 | `--compression, --no-compression` | boolean | unset | Summarize each retrieved source before answering, or send the full text. Omit to use the domain profile's setting. |
+| `--filters` | text | unset | JSON corpus filters, including document dates, projects, and tags. |
 
 ## `sci-rag stats`
 
@@ -296,7 +326,7 @@ $ sci-rag graph [OPTIONS] COMMAND [ARGS]...
 
 ## `sci-rag graph extract`
 
-Extract concepts and relationships from ingested chunks. Needs LLM provider credentials. Only chunks the extractor has not seen are processed, so re-running after a new ingest picks up just the new documents.
+Extract concepts and relationships from ingested chunks. Needs LLM provider credentials. Only chunks the extractor has not seen are processed, so re-running after a new ingest picks up just the new documents. Batches run one at a time unless --concurrency raises that; the resulting graph is the same either way, so the setting buys wall-clock time, not quality.
 
 ```console
 $ sci-rag graph extract [OPTIONS]
@@ -309,6 +339,21 @@ $ sci-rag graph extract [OPTIONS]
 | `--batch-size` | integer | 10 | Chunks per extraction call. |
 | `--all` | boolean | false | Re-read every chunk, including previously processed chunks. |
 | `--max-chunks` | integer | unset | Stop after this many chunks (for trials). |
+| `--concurrency` | integer range | 1 | Batches to keep in flight; 1 processes them in order. Raise it for a remote provider. |
+
+## `sci-rag graph reset`
+
+Clear derived entities, edges, and communities before an ontology rebuild.
+
+```console
+$ sci-rag graph reset [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--yes` | boolean | false | Confirm removal of derived graph data. |
 
 ## `sci-rag graph communities`
 
@@ -368,6 +413,113 @@ $ sci-rag graph gc [OPTIONS]
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `--dry-run, --apply` | boolean | true | --dry-run (default) reports what would go; --apply removes it. |
+
+## `sci-rag project`
+
+Manage document projects and personal metadata.
+
+```console
+$ sci-rag project [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag project create`
+
+Create a project explicitly and print its stable id.
+
+```console
+$ sci-rag project create [OPTIONS] NAME
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `NAME` | text | required | Project display name. |
+
+## `sci-rag project list`
+
+List projects and their current document counts.
+
+```console
+$ sci-rag project list [OPTIONS]
+```
+
+## `sci-rag project assign`
+
+Assign a current document manually and lock its ownership.
+
+```console
+$ sci-rag project assign [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--project` | text | required | Existing project id or slug. |
+
+## `sci-rag project tags`
+
+Replace manual tags while preserving automatic tags.
+
+```console
+$ sci-rag project tags [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--tag` | text | required | Manual tag; repeat for multiple tags. |
+
+## `sci-rag project classify`
+
+Apply ownership rules, infer remaining projects, and extract automatic tags.
+
+```console
+$ sci-rag project classify [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--rules` | path | unset | Ordered project rules YAML. |
+| `--rules-only` | boolean | false | Apply local rules without model calls. |
+
+## `sci-rag project rules`
+
+Check directory ownership rules.
+
+```console
+$ sci-rag project rules [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag project rules check`
+
+Report current documents matching multiple different projects.
+
+```console
+$ sci-rag project rules check [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--rules` | path | unset | Ordered project rules YAML. |
 
 ## `sci-rag campaign`
 
@@ -593,6 +745,218 @@ $ sci-rag draft prompts [OPTIONS] NAME
 | `--apply` | boolean | false | Write the prompt file directly, with no .proposed file to review. |
 | `--dry-run` | boolean | false | Show the rewrite without writing anything. |
 
+## `sci-rag relate`
+
+Inspect source-attributed document relations.
+
+```console
+$ sci-rag relate [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag relate similar`
+
+Rank current documents using centered means in the caller's visible corpus.
+
+```console
+$ sci-rag relate similar [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--license` | text | unset | - |
+| `--source` | text | unset | - |
+| `--limit` | integer range | 8 | - |
+
+## `sci-rag relate projects`
+
+List other visible documents assigned to the same project.
+
+```console
+$ sci-rag relate projects [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--license` | text | unset | - |
+| `--source` | text | unset | - |
+| `--limit` | integer range | 8 | - |
+
+## `sci-rag relate citations`
+
+Read visible outgoing and incoming references with source evidence.
+
+```console
+$ sci-rag relate citations [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--license` | text | unset | - |
+| `--source` | text | unset | - |
+| `--limit` | integer range | 8 | - |
+
+## `sci-rag relate versions`
+
+Explicitly inspect retained revisions, preserving all other scope filters.
+
+```console
+$ sci-rag relate versions [OPTIONS] DOCUMENT_ID
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `DOCUMENT_ID` | text | required | - |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--license` | text | unset | - |
+| `--source` | text | unset | - |
+
+## `sci-rag relate mentions`
+
+Detect literal local links and DOI mentions; default to a dry run.
+
+```console
+$ sci-rag relate mentions [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--apply` | boolean | false | - |
+
+## `sci-rag relate embeddings`
+
+Rebuild document means from existing chunk vectors without model calls.
+
+```console
+$ sci-rag relate embeddings [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--apply` | boolean | false | - |
+
+## `sci-rag browse`
+
+Browse current files by project, document date, and named topic.
+
+```console
+$ sci-rag browse [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag browse documents`
+
+List current files in document-date order, with explicit pagination.
+
+```console
+$ sci-rag browse documents [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--filters` | text | unset | JSON filter object: sources, projects, date_min/date_max, tags, auto_tags, entity_names. |
+| `--page` | integer range | 1 | - |
+| `--page-size` | integer range | 20 | - |
+
+## `sci-rag browse facets`
+
+Count every registered dimension, including empty-value buckets.
+
+```console
+$ sci-rag browse facets [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--filters` | text | unset | JSON filter object. |
+
+## `sci-rag browse projects`
+
+Browse project counts or documents belonging to one project.
+
+```console
+$ sci-rag browse projects [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--by` | text | unset | Stable project id to browse; omit for counts. |
+| `--filters` | text | unset | - |
+| `--page` | integer range | 1 | - |
+| `--page-size` | integer range | 20 | - |
+
+## `sci-rag browse timeline`
+
+Browse document-date months, retaining the unknown-date bucket.
+
+```console
+$ sci-rag browse timeline [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--by` | text | unset | Month YYYY-MM; omit for monthly counts. |
+| `--filters` | text | unset | - |
+| `--page` | integer range | 1 | - |
+| `--page-size` | integer range | 20 | - |
+
+## `sci-rag browse topics`
+
+Browse literal named topics; community summaries never define filters.
+
+```console
+$ sci-rag browse topics [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--by` | text | unset | Exact named topic; omit for counts. |
+| `--filters` | text | unset | - |
+| `--page` | integer range | 1 | - |
+| `--page-size` | integer range | 20 | - |
+
 ## `sci-rag eval`
 
 Measure quality against your seed questions: retrieval scores, what each retrieval layer contributes, and graded answers.
@@ -637,6 +1001,7 @@ $ sci-rag eval answers [OPTIONS]
 | `--judge-model` | text | unset | Judge model spec, 'model' or 'provider:model'. Overrides SCI_RAG_JUDGE_MODEL. |
 | `--snapshot` | text | unset | Record this corpus snapshot name in the report. |
 | `--compressed` | boolean | false | Summarize each retrieved source before answering, as a separate condition to compare. |
+| `--concurrency` | integer | 1 | Questions answered at once. Raise it for a remote provider; 1 is serial. |
 
 ## `sci-rag eval diff`
 
@@ -695,6 +1060,73 @@ $ sci-rag eval calibrate [OPTIONS]
 | `--labels` | path | required | Human labels (labels.jsonl). |
 | `--report` | path | unset | Answers report.json (or its run directory) to calibrate against. Defaults to the newest answers run under eval_results/. |
 | `--output` | path | unset | Also write the calibration markdown to this path. |
+
+## `sci-rag refresh`
+
+Refresh local files and inspect durable run history.
+
+```console
+$ sci-rag refresh [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag refresh run`
+
+Run one guarded refresh, persist its result, and return its actual exit code.
+
+```console
+$ sci-rag refresh run [OPTIONS] ROOT
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `ROOT` | path | required | Explicit corpus root. |
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--channel` | text | manual | manual, scheduler, hooks, or poll. |
+| `--manifest` | path | unset | Optional corpus manifest directly under the root. |
+| `--no-graph, --no-no-graph` | boolean | false | Disable model-based graph updates. |
+| `--no-docling, --no-no-docling` | boolean | false | Use the local pypdf route. |
+
+## `sci-rag refresh history`
+
+List content-free outcomes, including failed and interrupted runs.
+
+```console
+$ sci-rag refresh history [OPTIONS]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `--limit` | integer range | 20 | - |
+
+## `sci-rag agent`
+
+Invoke the local Agent memory adapter.
+
+```console
+$ sci-rag agent [OPTIONS] COMMAND [ARGS]...
+```
+
+## `sci-rag agent call`
+
+Read a JSON payload on stdin and return the local operation result.
+
+```console
+$ sci-rag agent call [OPTIONS] OPERATION
+```
+
+### Arguments
+
+| Name | Type | Default | Description |
+|---|---|---|---|
+| `OPERATION` | text | required | - |
 
 ## `sci-rag embed`
 
@@ -811,7 +1243,7 @@ $ sci-rag corpus export [OPTIONS] OUTDIR
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `--format` | text | jsonl | jsonl (no extra dependency) or parquet (needs --extra export). |
-| `--license` | text | empty | Export only these license classes (repeatable). Omit for everything. An export is a redistribution, so a scope excludes 'unknown' unless you name it. |
+| `--license` | text | empty | Export external-safe license classes (repeatable). Omit for public/open_commercial. Unknown and restricted rights are excluded. |
 | `--include-embeddings` | boolean | false | Include chunk vectors (large, rarely wanted). |
 
 ## Shell help is authoritative too

@@ -198,7 +198,7 @@ def test_invalid_modelscope_device_is_rejected(invalid_device: str) -> None:
 
 @pytest.mark.parametrize(
     ("raw_device", "normalized_device"),
-    [("AUTO", "auto"), (" CPU ", "cpu"), ("CUDA:1", "cuda:1")],
+    [("AUTO", "auto"), (" CPU ", "cpu"), ("CUDA:1", "cuda:1"), ("MPS", "mps")],
 )
 def test_modelscope_device_values_are_normalized(raw_device: str, normalized_device: str) -> None:
     settings = Settings(_env_file=None, modelscope_device=raw_device)

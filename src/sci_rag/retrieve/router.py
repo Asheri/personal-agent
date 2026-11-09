@@ -32,6 +32,7 @@ log = structlog.get_logger(__name__)
 
 # Connectives that signal the answer spans more than one fact.
 _MULTI_HOP_PATTERNS = (
+    r"比较|对比|区别|差异|关系|类似|相似|分别|共同|跨文件|之前.*项目",
     r"\bcompare\b",
     r"\bversus\b",
     r"\bvs\.?\b",
@@ -46,6 +47,7 @@ _MULTI_HOP_PATTERNS = (
 
 # Openers of a single-fact lookup.
 _LOOKUP_PATTERNS = (
+    r"是谁|谁是|哪个|哪份|在哪|哪里|什么时候|多少|查找|查一下|属于",
     r"^\s*what (is|are|was|were)\b",
     r"^\s*how (much|many)\b",
     r"^\s*when (is|was|does|did)\b",
@@ -56,6 +58,7 @@ _LOOKUP_PATTERNS = (
 
 # The corpus-overview signals that community summaries exist for.
 _OVERVIEW_PATTERNS = (
+    r"概述|综述|汇总|概览|主要主题|全部主题|总体情况",
     r"\boverview\b",
     r"\bsummar(y|ize|ise)\b",
     r"\bbig picture\b",
@@ -141,7 +144,7 @@ async def route(
             reasons=tuple(reasons),
         )
 
-    if lookup and words <= _LOOKUP_MAX_WORDS:
+    if lookup and words <= _LOOKUP_MAX_WORDS and len(lowered) <= 120:
         reasons.append(
             f"single-fact lookup phrasing in a short query ({words} words); "
             "vector + keyword answer these without the deep layers"

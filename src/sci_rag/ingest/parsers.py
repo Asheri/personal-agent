@@ -1,6 +1,6 @@
 """Turn source files into a common shape the chunker understands.
 
-Three routes, one output type:
+Several routes, one output type:
 
 * PDFs go through Docling when it is installed (best table extraction; it
   is the ``docling`` extra because it pulls a large ML stack) and fall back
@@ -12,6 +12,8 @@ Three routes, one output type:
   pipe tables so they travel the Markdown route's path. See
   :mod:`sci_rag.ingest.html_parser`.
 * Plain text is passed through raw; the chunker applies its own heuristics.
+* DOCX and PPTX use the optional ``office`` extra and produce structured
+  headings, paragraphs, and pipe tables.
 
 Docling output is exported to Markdown and re-parsed, so both structured
 routes share one battle-tested block segmentation instead of tracking two
@@ -24,9 +26,15 @@ import re
 from dataclasses import dataclass, field
 from importlib.util import find_spec
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import structlog
+
+from sci_rag.ingest.errors import ParserError, check_source
+from sci_rag.ingest.suffixes import CODE_SUFFIXES, DATA_SUFFIXES, IMAGE_SUFFIXES, SUPPORTED_SUFFIXES
+
+if TYPE_CHECKING:
+    from sci_rag.ingest.ocr import OcrEngine
 
 log = structlog.get_logger(__name__)
 
@@ -51,8 +59,6 @@ class ParsedDocument:
     metadata: dict[str, Any] = field(default_factory=dict)
 
 
-SUPPORTED_SUFFIXES = {".pdf", ".md", ".markdown", ".txt", ".html", ".htm"}
-
 _HEADING_RE = re.compile(r"^(#{1,6})\s+(.*)$")
 
 
@@ -60,13 +66,50 @@ def docling_available() -> bool:
     return find_spec("docling") is not None
 
 
-def parse_file(path: Path, *, prefer_docling: bool = True) -> ParsedDocument:
+def parse_file(
+    path: Path, *, prefer_docling: bool = True, ocr_engine: OcrEngine | None = None
+) -> ParsedDocument:
+    documents = parse_file_many(path, prefer_docling=prefer_docling, ocr_engine=ocr_engine)
+    if not documents:
+        raise ParserError("empty_container", "mbox")
+    return documents[0]
+
+
+def parse_file_many(
+    path: Path, *, prefer_docling: bool = True, ocr_engine: OcrEngine | None = None
+) -> list[ParsedDocument]:
+    if path.suffix.lower() not in SUPPORTED_SUFFIXES:
+        raise ValueError(
+            f"Unsupported file type {path.suffix!r}. Supported: {', '.join(sorted(SUPPORTED_SUFFIXES))}"
+        )
+    check_source(path)
+    if path.suffix.lower() in {".eml", ".mbox"}:
+        from sci_rag.ingest.email_parser import parse_mail
+
+        return parse_mail(path)
+    return [_parse_single(path, prefer_docling=prefer_docling, ocr_engine=ocr_engine)]
+
+
+def _parse_single(
+    path: Path, *, prefer_docling: bool, ocr_engine: OcrEngine | None
+) -> ParsedDocument:
     suffix = path.suffix.lower()
     if suffix == ".pdf":
+        # Probe each page before accepting a whole-document rich-text result:
+        # a long native page must not hide an empty scanned page next to it.
+        native = _parse_pdf_pypdf(path)
+        pages = native.metadata.pop("_scan_pages", [])
+        if pages:
+            from sci_rag.ingest.ocr import scan_pages
+
+            return scan_pages(path, native, pages, ocr_engine)
         if prefer_docling and docling_available():
-            return _parse_pdf_docling(path)
-        log.info("pdf_parser_fallback", path=str(path), parser="pypdf")
-        return _parse_pdf_pypdf(path)
+            rich = _parse_pdf_docling(path)
+            content = rich.raw_text or "\n".join(b.text for b in rich.blocks or [])
+            if len(content.strip()) >= 40 * (rich.page_count or 1):
+                return rich
+        log.info("pdf_parser_fallback", parser="pypdf")
+        return native
     if suffix in (".md", ".markdown"):
         return parse_markdown(path.read_text(encoding="utf-8"), fallback_title=path.stem)
     if suffix in (".html", ".htm"):
@@ -74,7 +117,36 @@ def parse_file(path: Path, *, prefer_docling: bool = True) -> ParsedDocument:
 
         return parse_html_file(path)
     if suffix == ".txt":
-        return ParsedDocument(title=path.stem, raw_text=path.read_text(encoding="utf-8"))
+        from sci_rag.ingest.text_formats import read_text
+
+        text, encoding = read_text(path)
+        return ParsedDocument(
+            title=path.stem, raw_text=text, metadata={"parser": "text", "encoding": encoding}
+        )
+    if suffix in CODE_SUFFIXES:
+        from sci_rag.ingest.text_formats import parse_code
+
+        return parse_code(path)
+    if suffix in DATA_SUFFIXES:
+        from sci_rag.ingest.text_formats import parse_data
+
+        return parse_data(path)
+    if suffix in IMAGE_SUFFIXES:
+        from sci_rag.ingest.ocr import parse_image
+
+        return parse_image(path, ocr_engine)
+    if suffix in {".docx", ".pptx", ".xlsx"}:
+        with path.open("rb") as source:
+            if source.read(8) == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1":
+                raise ParserError("encrypted", suffix[1:])
+    if suffix == ".xlsx":
+        from sci_rag.ingest.spreadsheets import parse_xlsx
+
+        return parse_xlsx(path)
+    if suffix in (".docx", ".pptx"):
+        from sci_rag.ingest.office import parse_docx, parse_pptx
+
+        return parse_docx(path) if suffix == ".docx" else parse_pptx(path)
     raise ValueError(
         f"Unsupported file type {suffix!r} for {path.name}. "
         f"Supported: {', '.join(sorted(SUPPORTED_SUFFIXES))}"
@@ -134,6 +206,11 @@ def _parse_pdf_pypdf(path: Path) -> ParsedDocument:
 
     reader = PdfReader(str(path))
     pages = [(page.extract_text() or "") for page in reader.pages]
+    scans = [
+        i
+        for i, page in enumerate(reader.pages)
+        if len(pages[i].strip()) < 40 and len(page.images) > 0
+    ]
     meta_title = None
     if reader.metadata is not None:
         meta_title = (reader.metadata.title or "").strip() or None
@@ -141,14 +218,14 @@ def _parse_pdf_pypdf(path: Path) -> ParsedDocument:
         title=meta_title or path.stem,
         raw_text="\f".join(pages),
         page_count=len(pages),
-        metadata={"parser": "pypdf"},
+        metadata={"parser": "pypdf", **({"_scan_pages": scans} if scans else {})},
     )
 
 
 def _parse_pdf_docling(path: Path) -> ParsedDocument:
     from docling.document_converter import DocumentConverter
 
-    log.info("pdf_parser", path=str(path), parser="docling")
+    log.info("pdf_parser", parser="docling")
     result = DocumentConverter().convert(str(path))
     document = result.document
     markdown = document.export_to_markdown()

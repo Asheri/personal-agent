@@ -50,6 +50,7 @@ Codes you can branch on:
 | <a id="insufficient_scope"></a>`insufficient_scope` | 403 | Key lacks the required scope |
 | <a id="rate_limited"></a>`rate_limited` | 429 | Over the per-key limit; honor `Retry-After` |
 | <a id="invalid_request"></a>`invalid_request` | 422 | Body failed validation |
+| <a id="invalid_relation"></a>`invalid_relation` | 422 | Relation kind or result limit is invalid |
 | <a id="document_not_found"></a>`document_not_found` | 404 | Unknown document id |
 | <a id="llm_unavailable"></a>`llm_unavailable` | 503 | No LLM credentials configured server-side |
 | <a id="generation_failed"></a>`generation_failed` | 502 | The model call failed |
@@ -137,6 +138,11 @@ The corpus catalog (scope `corpus:read`): paginated summaries with title, source
 
 ### GET /v1/status, GET /health, GET /v1/corpus-manifest
 
+Document relation endpoints are also available at `GET /v1/documents/{id}/related`
+and `GET /v1/documents/{id}/versions` (scope `corpus:read`). Both accept repeated
+`license_classes` and `sources`; related views also accept `relation` and `limit`.
+See [Document relations](document-relations.md) for evidence and history semantics.
+
 `status` (scope `corpus:read`): counts of everything plus breakdowns by license, source, and embedding version. `health` (no auth): liveness plus a database check. `corpus-manifest` (no auth, deliberately): the machine-readable descriptor of this knowledge base. Includes domain, counts, embedding model and dimension, retrieval layers and fusion weights, endpoint URLs, and feature flags. A router in front of several sci-rag deployments reads this to decide which knowledge base fits a query.
 
 ## MCP
@@ -146,14 +152,16 @@ MCP exposes the corpus to agents through two transports:
 * **stdio** (local agents): `sci-rag mcp`, or register with `claude mcp add my-corpus -- uv run --directory /path/to/repo sci-rag mcp`
 * **HTTP** (remote agents): `POST /mcp/` on the running server, guarded by bearer keys (scope `retrieval:query`).
 
-The eight tools:
+The ten tools:
 
 | Tool | Use it to |
 |------|-----------|
 | `search_corpus(query, top_k, deep, license_classes, year_min, year_max, journals)` | get ranked evidence chunks to reason over yourself |
 | `answer_question(query, top_k, license_classes)` | get a grounded answer with numbered citations |
 | `get_document(document_id)` | inspect a cited source: metadata, license, chunk previews |
-| `get_citations(document_id)` | follow its references and the corpus documents that cite it |
+| `get_citations(document_id, license_classes, sources)` | follow its visible references and the corpus documents that cite it |
+| `get_related_documents(document_id, relation, limit, license_classes, sources)` | inspect scoped similarity, literal references, and project peers |
+| `get_document_versions(document_id, license_classes, sources)` | explicitly inspect visible retained revisions |
 | `search_entities(name_contains, entity_type, limit)` | find knowledge-graph entities by name |
 | `get_entity_relationships(entity_name)` | see every stated relationship of an entity, with evidence quotes |
 | `list_sources()` | learn the corpus's source buckets and license mix |
@@ -199,3 +207,10 @@ print(answer.text, [s.citation for s in answer.cited_sources])
 ```
 
 Ingestion, graph building, and evaluation are importable the same way (`ingest_entries`, `extract_graph`, `build_communities`, `run_retrieval_eval`). See `examples/library_quickstart.py` for a complete, runnable walkthrough.
+## PC-Mem corpus filters and browsing
+
+The v1.8 candidate adds document dates, projects, tags, automatic tags, and entity
+names to query/answer filters. Browse/facets sort by document date descending,
+nulls last, then ingestion time descending and id. REST and MCP share the same
+operations; external MCP rights are intersected with public/open-commercial.
+See [core engineering](core-completion.md) for endpoints, null buckets, and limits.

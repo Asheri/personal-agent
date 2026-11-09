@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
 from platform_checks import posix_shell
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="the helper builds a WindowsPath once os.name is patched to nt, and "
+    "pathlib refuses to construct one on a POSIX host",
+)
 def test_missing_windows_posix_shell_skips_with_a_diagnostic(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import os
     import shutil
     from pathlib import Path
 

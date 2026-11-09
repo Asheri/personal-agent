@@ -20,6 +20,7 @@ docstring for the two reasons why.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -73,11 +74,27 @@ def load_manifest(manifest_path: Path) -> list[CorpusEntry]:
 
 def discover_folder(folder: Path, *, source: str = "local") -> list[CorpusEntry]:
     """Build manifest entries for every supported file under a folder."""
-    entries = [
-        CorpusEntry(path=path.resolve(), source=source)
-        for path in sorted(folder.rglob("*"))
-        if path.is_file() and path.suffix.lower() in SUPPORTED_SUFFIXES
-    ]
+    if not folder.is_dir():
+        raise ValueError("Source folder must be an existing directory")
+
+    def inaccessible(error: OSError) -> None:
+        raise error
+
+    entries = []
+    for directory, subdirectories, filenames in os.walk(
+        folder, onerror=inaccessible, followlinks=False
+    ):
+        subdirectories[:] = [
+            name
+            for name in subdirectories
+            if not Path(directory, name).is_symlink()
+            and not (getattr(Path(directory, name).stat(), "st_file_attributes", 0) & 0x400)
+        ]
+        for name in sorted(filenames):
+            path = Path(directory, name)
+            if not path.is_symlink() and path.suffix.lower() in SUPPORTED_SUFFIXES:
+                entries.append(CorpusEntry(path=path.resolve(), source=source))
+    entries.sort(key=lambda entry: str(entry.path))
     return entries
 
 

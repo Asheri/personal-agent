@@ -15,6 +15,7 @@ the recovery is to try smaller, deterministically, rather than to try again.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -70,6 +71,11 @@ class TruncatingLLM(LLMClient):
         passage_count = sum(1 for line in prompt.splitlines() if line[:1].isdigit())
         self.batch_sizes.append(passage_count)
         body = _extraction(passage_count)
+        for match in re.finditer(r"(?m)^(\d+)\. .*?Residue (\d+)", prompt):
+            body = body.replace(
+                json.dumps(f"feedstock {match.group(1)}"),
+                json.dumps(f"Residue {match.group(2)}"),
+            )
         if passage_count > self.max_passages:
             return body[: len(body) // 2]
         return body

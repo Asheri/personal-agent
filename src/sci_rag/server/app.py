@@ -37,6 +37,7 @@ from sci_rag.server.errors import (
 )
 from sci_rag.server.mcp_server import build_mcp_server
 from sci_rag.server.routers import answer_router, documents_router, meta_router, query_router
+from sci_rag.server.routers.browse import router as browse_router
 from sci_rag.server.service import RagService
 
 API_DESCRIPTION = """
@@ -137,6 +138,7 @@ def create_app(*, settings: Settings | None = None, service: RagService | None =
     app.include_router(query_router)
     app.include_router(answer_router)
     app.include_router(documents_router)
+    app.include_router(browse_router)
     app.mount("/mcp", _BearerAuthASGI(mcp_app, auth_backend, required_scope="retrieval:query"))
 
     @app.get("/", include_in_schema=False)
