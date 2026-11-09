@@ -1,0 +1,14 @@
+# One line ending on every platform. A Windows checkout writes CRLF, which
+# turned files nobody edited into full-file diffs; `eol=lf` keeps the working
+# tree and the committed blob identical on macOS, Linux, and Windows.
+* text=auto eol=lf
+
+# Test fixtures the Office readers parse. Keep them byte-exact: a line-ending
+# conversion would corrupt the OOXML container.
+*.docx binary
+*.pptx binary
+*.xlsx binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.webp binary

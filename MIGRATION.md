@@ -146,3 +146,30 @@ ADR 0020, and the dated candidate/review. Acceptance does not register a persist
 OS task, run a live model conversation, access a personal corpus, or approve a
 merge. Optional P6 research, independent review, and course deliverables remain
 separate. Historical migration and candidate records remain unchanged.
+
+## Pinned sources and licenses (2026-11-09)
+
+The ledger above recorded a local worktree path for sci-rag-kit and a commit
+hash for GenericAgent. Both are now resolved one step further, because a reader
+had no way to check either.
+
+- **Sci RAG Kit base: tag `v0.5.0`, commit
+  `298d2b7892d8a3db52a98b08827e0603650bad21`.** Identified by diffing
+  `pyproject.toml` and `src/sci_rag/retrieve/retriever.py` against that tag:
+  the only differences are this project's own additions (`jieba`, the `office`
+  and `ocr` extras, the `modelscope-embedding` extra, and the PC-Mem modules).
+  The copy therefore follows no later upstream commit.
+- **GenericAgent commit `a9a36b4b219593369de01c3e5973e56ac02a568b` does not
+  resolve** in the public repository as of 2026-11-09, and no license file
+  exists in the history reachable today, although GitHub reports MIT for the
+  repository. The vendored files are pinned by git blob SHA-1 instead, and the
+  MIT text is reproduced, in `THIRD-PARTY-NOTICES.md`. Confirm the grant with
+  upstream before redistributing this work under another name.
+- **Reader-facing provenance** lives in `README.md` section "What comes from
+  where" and in `README_ZH.md` section "来源声明". Those two tables are the
+  public copy of this ledger; keep them in step when a part changes status.
+- **Line endings** are now pinned by a new `.gitattributes` (`* text=auto
+  eol=lf`). The 2026-10-14 migration copied a Windows worktree, so files that
+  never changed differ by CRLF alone when compared on another platform. The
+  new rule keeps blob and working tree identical on all three operating
+  systems.
