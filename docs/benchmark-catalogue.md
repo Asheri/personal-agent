@@ -5,6 +5,8 @@ description: Which public benchmark to run, what each one tests, the GPU-hours e
 
 # Benchmark catalogue
 
+中文版：[基准测试目录](benchmark-catalogue.zh.md)
+
 Which public benchmark to run for the graph-versus-retrieval question, what each
 one exercises, and what it costs before anybody starts. A benchmark is chosen
 for the question it can answer, not for its size.

@@ -30,6 +30,7 @@ Four types, from the [Diataxis](https://diataxis.fr/) framework. A page that can
 | `campaigns.md` | how-to |
 | `evaluation.md` | how-to |
 | `benchmark-catalogue.md` | explanation |
+| `benchmark-catalogue.zh.md` | explanation |
 | `extend.md` | how-to |
 | `operations.md` | how-to |
 | `deploy-gcp.md` | how-to |

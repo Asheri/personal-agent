@@ -91,6 +91,7 @@ nav:
       - guides.md
       - Evaluate your pipeline: evaluation.md
       - Benchmark catalogue: benchmark-catalogue.md
+      - 基准测试目录: benchmark-catalogue.zh.md
       - Run a corpus campaign: campaigns.md
       - Configure Postgres backend: run-postgres.md
       - Operate a live corpus: operations.md

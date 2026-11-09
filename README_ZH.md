@@ -64,6 +64,7 @@ uv run sci-rag doctor
 | 一次性增量刷新 | `uv run sci-rag refresh run <目录> --channel manual` |
 | 起服务 | `uv run sci-rag serve`（REST 在 `/docs`，MCP 在 `/mcp`） |
 | 检索消融 | `uv run sci-rag eval retrieval --ablation` |
+| 有 GPU、要跑更大的评测 | 看 [`docs/benchmark-catalogue.zh.md`](docs/benchmark-catalogue.zh.md) |
 
 完整命令树见 [`docs/cli.md`](docs/cli.md)。
 
