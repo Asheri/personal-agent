@@ -169,6 +169,24 @@ uv run pytest tests/unit -q
 
 ## 6. 任务台账
 
+Scoped change (2026-11-10): graph-extraction concurrency. `sci-rag graph extract`
+and `sci-rag build` take `--concurrency N` (default 1, so existing behavior and
+existing reports are unchanged). Batches are cut from one query so no two workers
+pick the same chunk; each batch still takes `pg_advisory_xact_lock` before its
+lookups, upserts, and commit, so the stored graph does not depend on the setting
+and `tests/integration/test_graph_concurrency.py` asserts the same entities and
+relationships at 1, 2, and 4 in flight. Recorded as ADR 0021. No spec clause,
+acceptance criterion, or scope rule changes: §4.6's single-writer rule is about
+writes, and writes still serialize. Docs updated in the same change:
+`docs/cli.md` (regenerated), `docs/benchmark-catalogue.md` and its Chinese edition
+(the "benchmark-scale extraction is a research task" conclusion is superseded),
+plus ADR 0021. Independent review is still expected before merge per §5.2; the
+review question is whether the merge argument above survives a reader who did not
+write the tests. Note for the next person re-rendering the CLI page: `docs/cli.md`
+was committed with CRLF against `.gitattributes`, so its first re-render from any
+platform normalizes the whole file's line endings even though the content delta is
+four lines.
+
 Scoped serial follow-up (2026-10-26): course engineering is the v1.8 candidate.
 See `docs/core-completion.md`, `docs/engineering-requirements.md`, ADR 0020, and
 the dated review template. Revisions 0012/0013 add dates/access and refresh audit.

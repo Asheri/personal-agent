@@ -186,20 +186,28 @@ seconds per call instead of the provider's token budget.
 
 Two consequences for anyone planning a larger run:
 
-- **Decode time dominates.** At roughly 40 tokens/s per single-stream call,
-  a 1.9 output-to-input ratio means the graph costs hours whatever the token
-  ceiling is. Parallel extraction, or a smaller batch that never truncates, is
-  the fix, and neither is wired up today.
+- **Decode time dominates.** At roughly 40 tokens/s per single-stream call, a
+  1.9 output-to-input ratio makes a serial build cost hours whatever the token
+  ceiling is. `sci-rag graph extract --concurrency N` keeps N batches in flight,
+  so that decode happens N-wide. Each batch still writes behind the document-write
+  lock, so the stored graph does not depend on the setting. At 8 in flight the
+  roughly 240 calls behind a full MultiHop-RAG graph are about an hour of decode
+  in place of thirteen; that is arithmetic from the smoke run above, not a
+  finished build. A smaller batch that never truncates remains the other lever.
 - **The domain profile has to match the corpus.** The same 20 articles through
   the shipped `domain/` agricultural ontology produced almost nothing: the model
   obeyed "use ONLY these entity types" and news names fit none of them. Point
   `SCI_RAG_DOMAIN_DIR` at a profile whose types cover the corpus before
   concluding that extraction is weak.
 
-Practical reading: on this pipeline, a benchmark-wide graph is a research task,
-not a configuration change. Run `plain` against `rag` on the public benchmark,
-and make the graph claim on a personal corpus where documents are small and the
-ontology fits.
+Practical reading: concurrency moves a benchmark-wide graph from a research task
+to an afternoon of provider time. What has not moved is the corpus-size wall: a
+paragraph-level corpus (HotpotQA publishes about 74k paragraphs, MuSiQue about
+50k) has one chunk per paragraph, and no concurrency setting makes 74k model
+calls cheap. On MultiHop-RAG's 609 articles it is affordable, so run `plain`,
+`rag`, and `kg` there. The ontology argument is unchanged: point
+`SCI_RAG_DOMAIN_DIR` at a profile whose entity types cover the corpus, or the
+graph stage returns almost nothing whatever the throughput.
 
 ## Local embedding, measured
 

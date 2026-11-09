@@ -334,6 +334,15 @@ typed relation endpoints, and literal passage evidence. Invalid edges are reject
 [Controlled personal-file quality](personal-quality.md) explains the actual-model
 tests and why their constructed labels still need independent human review.
 
+### Can extraction run several batches at once?
+
+`sci-rag graph extract --concurrency N` keeps N batches in flight. The default is
+1, which is the setting every earlier report was produced with. Batches overlap
+their model calls and still write one at a time behind the document-write lock, so
+the stored graph does not depend on the flag.
+[ADR 0021](adr/0021-graph-extraction-concurrency.md) records the merge argument and
+the conditions that would send it back to serial.
+
 ### Can I add my own parser, reranker, or model provider?
 
 [Core engineering](core-completion.md) and [Agent deployment](deploy-pcmem.md)
