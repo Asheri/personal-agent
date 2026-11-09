@@ -15,6 +15,10 @@ from sci_rag.db import Document, get_session_factory
 from sci_rag.licensing import EXTERNAL_SAFE_CLASSES
 from sci_rag.versions import canonical_source_path
 
+# `subprocess.CREATE_NO_WINDOW` exists on Windows only. `getattr` keeps the
+# module importable, and type-checkable, on macOS and Linux.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 async def agent_operation(operation: str, payload: dict[str, Any]) -> dict[str, Any]:
     from sci_rag.memory_state import maintain_lifecycle
@@ -143,7 +147,7 @@ class CliAgentClient:
             capture_output=True,
             text=True,
             timeout=180,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            creationflags=_NO_WINDOW,
         )
         for line in reversed(result.stdout.splitlines()):
             try:

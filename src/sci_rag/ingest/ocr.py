@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 import io
 import math
-import os
 import re
 import shutil
 import subprocess
@@ -15,6 +14,10 @@ from typing import Protocol
 
 from sci_rag.ingest.errors import ParserError
 from sci_rag.ingest.parsers import Block, ParsedDocument
+
+# `subprocess.CREATE_NO_WINDOW` exists on Windows only. `getattr` keeps the
+# module importable, and type-checkable, on macOS and Linux.
+_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class OcrEngine(Protocol):
@@ -47,7 +50,7 @@ class TesseractOcrEngine:
                 command,
                 capture_output=True,
                 timeout=60,
-                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+                creationflags=_NO_WINDOW,
             )
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise ParserError("ocr_unavailable", "ocr_image") from exc
