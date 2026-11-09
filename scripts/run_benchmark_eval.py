@@ -47,6 +47,8 @@ import json
 import math
 import random
 import re
+import statistics
+import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -90,6 +92,8 @@ class ConditionRecord:
     condition: str
     answer: str = ""
     cited: int = 0
+    prompt_tokens: int = 0
+    seconds: float = 0.0
     correctness: int | None = None
     grounding: int | None = None
     error: str = ""
@@ -307,18 +311,23 @@ async def run_condition(
 
     limiter = asyncio.Semaphore(max(1, concurrency))
 
+    done = 0
+
     async def one(question: SeedQuestion) -> ConditionRecord:
+        nonlocal done
         record = ConditionRecord(
             question_id=question.id,
             question_type=question.tags[0] if question.tags else "untyped",
             condition=condition.name,
         )
         async with limiter:
+            started = time.perf_counter()
             try:
                 if condition.retrieve:
                     result = await engine.answer(question.question, profile="deep", limit=limit)
                     record.answer = result.text
                     record.cited = len(result.cited_sources)
+                    record.prompt_tokens = result.prompt_tokens_after or result.prompt_tokens_before
                     sources_block = None
                 else:
                     text, cited = await _answer_plain(engine, question, limit)
@@ -327,6 +336,7 @@ async def run_condition(
                     sources_block = PLAIN_SOURCES
             except Exception as exc:  # one question must not kill the run
                 record.error = f"answer: {type(exc).__name__}: {exc}"
+                record.seconds = time.perf_counter() - started
                 return record
 
             if sources_block is None:
@@ -337,32 +347,39 @@ async def run_condition(
                     format_sources(prompt_retrieval) if prompt_retrieval.items else PLAIN_SOURCES
                 )
             try:
-                record.grounding = (
-                    await grade_grounding(
-                        judge,
-                        engine.domain,
-                        question=question.question,
-                        answer_text=record.answer,
-                        sources_block=sources_block,
-                    )
-                ).score
+                grade = await grade_grounding(
+                    judge,
+                    engine.domain,
+                    question=question.question,
+                    answer_text=record.answer,
+                    sources_block=sources_block,
+                )
+                # Groundedness, citation accuracy and completeness are each 0-2;
+                # the mean keeps one number comparable with correctness.
+                record.grounding = round(
+                    (grade.groundedness + grade.citation_accuracy + grade.completeness) / 3, 2
+                )
             except Exception as exc:
                 record.error = f"grounding: {type(exc).__name__}: {exc}"
             if question.reference_answer:
                 try:
-                    record.correctness = (
-                        await grade_correctness(
-                            judge,
-                            engine.domain,
-                            question=question.question,
-                            reference_answer=question.reference_answer,
-                            answer_text=record.answer,
-                        )
-                    ).score
+                    grade = await grade_correctness(
+                        judge,
+                        engine.domain,
+                        question=question.question,
+                        reference_answer=question.reference_answer,
+                        answer_text=record.answer,
+                    )
+                    record.correctness = grade.correctness
                 except Exception as exc:
                     record.error = f"correctness: {type(exc).__name__}: {exc}"
+        record.seconds = time.perf_counter() - started
+        done += 1
+        if done % 10 == 0 or done == len(questions):
+            print(f"[{condition.name}] {done}/{len(questions)} answered", flush=True)
         return record
 
+    print(f"[{condition.name}] {len(questions)} questions, concurrency {concurrency}", flush=True)
     return list(await asyncio.gather(*(one(question) for question in questions)))
 
 
@@ -387,6 +404,14 @@ def summarize(records: list[ConditionRecord]) -> dict[str, Any]:
             }
         summary[name] = {
             "n": len(rows),
+            "mean_seconds": round(statistics.mean([r.seconds for r in rows]), 2) if rows else None,
+            "mean_prompt_tokens": round(
+                statistics.mean([r.prompt_tokens for r in rows if r.prompt_tokens]), 0
+            )
+            if any(r.prompt_tokens for r in rows)
+            else None,
+            "total_prompt_tokens": sum(r.prompt_tokens for r in rows),
+            "total_seconds": round(sum(r.seconds for r in rows), 1),
             "answered": len(answered),
             "errors": len(rows) - len(answered),
             "correct": len(correct),
