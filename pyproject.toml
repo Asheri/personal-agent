@@ -84,7 +84,7 @@ dev = [
 ]
 docs = [
   "mkdocs==1.6.*",
-  "mkdocs-material==9.7.*",
+  "mkdocs-material>=9.7,<9.9",
   "pymdown-extensions>=10.16,<12",
 ]
 # Kept out of `docs` so building the site stays a light install. Only the
